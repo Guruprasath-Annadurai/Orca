@@ -1,0 +1,74 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "orca-ai"
+version = "0.1.1"
+description = "Orca — 100% local private AI. Your hardware. Your data."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "Orca Systems" }]
+keywords = ["ai", "llm", "local", "private", "ollama", "agent"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: Other/Proprietary License",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "httpx>=0.27.0",
+    "rich>=13.0.0",
+    "typer>=0.12.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "aiofiles>=23.0.0",
+    "diskcache>=5.6.0",
+    "fastapi>=0.111.0",
+    "uvicorn>=0.30.0",
+    "python-multipart>=0.0.9",
+]
+
+[project.urls]
+Homepage     = "https://orca.systems"
+Docs         = "https://orca.systems/docs"
+Changelog    = "https://orca.systems/changelog"
+"Bug Tracker" = "https://github.com/orca-systems/orca/issues"
+
+[project.optional-dependencies]
+memory = ["chromadb>=0.5.0"]
+mcp    = ["mcp>=1.0.0"]
+stripe = ["stripe>=7.0.0"]
+dev    = ["pytest>=8.0.0", "pytest-asyncio>=0.23.0", "mypy>=1.10.0"]
+train  = [
+    "unsloth>=2024.11.0",
+    "trl>=0.12.0",
+    "transformers>=4.45.0",
+    "datasets>=3.0.0",
+    "peft>=0.13.0",
+    "bitsandbytes>=0.44.0",
+    "accelerate>=1.0.0",
+    "wandb>=0.18.0",
+    "scipy>=1.14.0",
+]
+
+[project.scripts]
+orca = "orca.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["orca"]
+
+[tool.hatch.build.targets.wheel.shared-data]
+"orca/serve/web" = "orca/serve/web"
+
+[tool.hatch.metadata]
+allow-direct-references = true

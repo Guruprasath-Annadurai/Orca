@@ -1,0 +1,40 @@
+version: '3.9'
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: atheris-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    # Uncomment for GPU support (requires nvidia-container-toolkit):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  atheris:
+    build: .
+    container_name: atheris-server
+    ports:
+      - "7337:7337"
+    volumes:
+      - atheris_data:/root/.orca
+    environment:
+      ORCA_OLLAMA_HOST: http://ollama:11434
+      ORCA_CORE_MODEL:  ${ORCA_CORE_MODEL:-qwen2.5:14b}
+      ORCA_NANO_MODEL:  ${ORCA_NANO_MODEL:-qwen2.5:7b}
+      ORCA_ULTRA_MODEL: ${ORCA_ULTRA_MODEL:-qwen2.5:14b}
+      ORCA_AUTH_SECRET: ${ORCA_AUTH_SECRET:-change-me-in-production}
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+  atheris_data:

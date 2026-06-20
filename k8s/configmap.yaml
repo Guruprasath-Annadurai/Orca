@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: atheris-config
+data:
+  core-model:  "qwen2.5:14b"
+  nano-model:  "qwen2.5:7b"
+  ultra-model: "qwen2.5:14b"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: atheris-pvc
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-pvc
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 50Gi
+---
+# Create this secret before deploying:
+# kubectl create secret generic atheris-secrets --from-literal=auth-secret=$(openssl rand -hex 32)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: atheris-secrets
+type: Opaque
+stringData:
+  auth-secret: "REPLACE_WITH_STRONG_SECRET"

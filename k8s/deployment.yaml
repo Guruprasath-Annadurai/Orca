@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atheris
+  labels:
+    app: atheris
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: atheris
+  template:
+    metadata:
+      labels:
+        app: atheris
+    spec:
+      containers:
+      - name: atheris
+        image: atheris:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 7337
+        env:
+        - name: ORCA_OLLAMA_HOST
+          value: "http://ollama:11434"
+        - name: ORCA_AUTH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: atheris-secrets
+              key: auth-secret
+        - name: ORCA_CORE_MODEL
+          valueFrom:
+            configMapKeyRef:
+              name: atheris-config
+              key: core-model
+        - name: ORCA_NANO_MODEL
+          valueFrom:
+            configMapKeyRef:
+              name: atheris-config
+              key: nano-model
+        - name: ORCA_ULTRA_MODEL
+          valueFrom:
+            configMapKeyRef:
+              name: atheris-config
+              key: ultra-model
+        volumeMounts:
+        - name: data
+          mountPath: /root/.orca
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /api/status
+            port: 7337
+          initialDelaySeconds: 15
+          periodSeconds: 30
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: atheris-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  labels:
+    app: ollama
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      containers:
+      - name: ollama
+        image: ollama/ollama:latest
+        ports:
+        - containerPort: 11434
+        volumeMounts:
+        - name: models
+          mountPath: /root/.ollama
+        resources:
+          requests:
+            memory: "8Gi"
+          limits:
+            memory: "16Gi"
+          # GPU: uncomment after installing nvidia-device-plugin
+          # limits:
+          #   nvidia.com/gpu: "1"
+      volumes:
+      - name: models
+        persistentVolumeClaim:
+          claimName: ollama-pvc

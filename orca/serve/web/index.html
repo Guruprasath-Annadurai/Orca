@@ -1,0 +1,2862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATHERIS — Private Intelligence</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap');
+
+:root {
+  --black:    #000000;
+  --surface:  #080808;
+  --surface2: #101010;
+  --surface3: #181818;
+  --line:     #1f1f1f;
+  --line2:    #2a2a2a;
+  --muted:    #4a4a4a;
+  --dim:      #666666;
+  --mid:      #999999;
+  --text:     #e8e8e8;
+  --white:    #ffffff;
+  --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --sans: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--black);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line2); }
+
+/* ── Corner bracket mixin ─────────────────────────────────────────────────── */
+.bracketed {
+  position: relative;
+}
+.bracketed::before, .bracketed::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-color: var(--line2);
+  border-style: solid;
+  pointer-events: none;
+}
+.bracketed::before {
+  top: -1px; left: -1px;
+  border-width: 1px 0 0 1px;
+}
+.bracketed::after {
+  bottom: -1px; right: -1px;
+  border-width: 0 1px 1px 0;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────────── */
+#header {
+  display: flex;
+  align-items: center;
+  height: 52px;
+  border-bottom: 1px solid var(--line);
+  padding: 0 20px;
+  flex-shrink: 0;
+  background: var(--black);
+  gap: 0;
+}
+
+.logo-mark {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-right: 20px;
+  border-right: 1px solid var(--line);
+}
+
+.logo-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.logo-text {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  color: var(--white);
+  text-transform: uppercase;
+}
+
+.logo-ver {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  margin-top: 1px;
+}
+
+.header-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.status-pip {
+  width: 5px;
+  height: 5px;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+.status-pip.online { background: var(--white); }
+.status-pip.offline { background: var(--muted); }
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 20px;
+  border-left: 1px solid var(--line);
+}
+
+.hbtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--line2);
+  background: transparent;
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.hbtn:hover { color: var(--white); border-color: var(--mid); }
+.hbtn svg { opacity: 0.7; }
+.hbtn:hover svg { opacity: 1; }
+
+/* ── Layout ─────────────────────────────────────────────────────────────────── */
+#layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Sidebar ────────────────────────────────────────────────────────────────── */
+#sidebar {
+  width: 220px;
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  background: var(--surface);
+}
+
+.sidebar-top {
+  padding: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.new-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  border: 1px solid var(--line2);
+  background: transparent;
+  color: var(--mid);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.new-btn:hover {
+  border-color: var(--white);
+  color: var(--white);
+  background: var(--surface3);
+}
+
+.sidebar-label {
+  padding: 14px 14px 6px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+#session-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px;
+}
+
+.sess-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.1s, background 0.1s;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sess-item:hover { color: var(--text); background: var(--surface2); }
+.sess-item.active { color: var(--white); }
+.sess-item svg { flex-shrink: 0; opacity: 0.4; }
+
+.sidebar-footer {
+  border-top: 1px solid var(--line);
+  padding: 12px 14px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.stat-val {
+  color: var(--mid);
+  font-weight: 500;
+}
+
+/* ── Chat area ──────────────────────────────────────────────────────────────── */
+#chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+/* ── Welcome screen ──────────────────────────────────────────────────────────── */
+#welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: 48px 32px;
+  gap: 40px;
+}
+
+.welcome-brand {
+  text-align: center;
+}
+
+.welcome-wordmark {
+  font-family: var(--mono);
+  font-size: 52px;
+  font-weight: 300;
+  letter-spacing: 0.45em;
+  color: var(--white);
+  line-height: 1;
+  text-transform: uppercase;
+  padding-right: 0.45em; /* compensate last letter spacing */
+}
+
+.welcome-tagline {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.32em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-top: 14px;
+}
+
+/* Sub-agent pods */
+.pods-section {
+  width: 100%;
+  max-width: 760px;
+}
+
+.pods-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.pods-label-text {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  color: var(--muted);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pods-label-line {
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.pods-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+
+.pod {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 12px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+}
+
+.pod:hover {
+  background: var(--surface2);
+}
+
+.pod-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--dim);
+  transition: color 0.15s;
+}
+
+.pod:hover .pod-icon { color: var(--white); }
+
+.pod-name {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  text-align: center;
+  text-transform: uppercase;
+  line-height: 1.4;
+  transition: color 0.15s;
+}
+
+.pod:hover .pod-name { color: var(--mid); }
+
+/* Starters */
+.starters-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  width: 100%;
+  max-width: 760px;
+}
+
+.starter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.starter:hover { background: var(--surface2); }
+
+.starter-icon {
+  color: var(--muted);
+  width: 16px;
+  height: 16px;
+  transition: color 0.15s;
+}
+
+.starter:hover .starter-icon { color: var(--white); }
+
+.starter-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.starter-desc {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* ── Messages ────────────────────────────────────────────────────────────────── */
+.msg-row {
+  display: flex;
+  gap: 0;
+  padding: 0;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+  animation: fadein 0.18s ease;
+}
+
+@keyframes fadein { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; } }
+
+.msg-row + .msg-row {
+  border-top: 1px solid var(--line);
+}
+
+.msg-role {
+  width: 80px;
+  flex-shrink: 0;
+  padding: 18px 0 18px 24px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  text-transform: uppercase;
+  display: flex;
+  align-items: flex-start;
+  padding-top: 20px;
+}
+
+.msg-body {
+  flex: 1;
+  padding: 18px 24px 18px 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.msg-row.user-row .msg-role { color: var(--dim); }
+.msg-row.user-row .msg-body { color: var(--mid); }
+.msg-row.user-row { background: transparent; }
+.msg-row.orca-row { background: var(--surface); }
+
+/* Markdown */
+.msg-body pre {
+  background: var(--black);
+  border: 1px solid var(--line2);
+  padding: 14px 16px;
+  overflow-x: auto;
+  margin: 12px 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.msg-body code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--surface2);
+  padding: 1px 5px;
+  border: 1px solid var(--line2);
+}
+
+.msg-body pre code { background: none; border: none; padding: 0; }
+
+.msg-body h1, .msg-body h2, .msg-body h3 {
+  font-weight: 600;
+  color: var(--white);
+  margin: 16px 0 6px;
+  line-height: 1.3;
+}
+.msg-body h1 { font-size: 17px; }
+.msg-body h2 { font-size: 15px; }
+.msg-body h3 { font-size: 13px; letter-spacing: 0.04em; }
+
+.msg-body p { margin: 6px 0; }
+.msg-body p:first-child { margin-top: 0; }
+.msg-body p:last-child { margin-bottom: 0; }
+
+.msg-body ul, .msg-body ol {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+.msg-body li { margin: 4px 0; }
+
+.msg-body strong { color: var(--white); font-weight: 600; }
+.msg-body em { color: var(--mid); font-style: italic; }
+.msg-body a { color: var(--white); text-decoration: underline; text-underline-offset: 3px; }
+.msg-body a:hover { color: var(--text); }
+
+.msg-body blockquote {
+  border-left: 2px solid var(--line2);
+  padding-left: 14px;
+  color: var(--dim);
+  margin: 8px 0;
+}
+
+.msg-body hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 12px 0;
+}
+
+.tool-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 24px 0 80px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: -6px;
+  padding-top: 8px;
+}
+
+.tool-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--line2);
+  color: var(--muted);
+}
+
+/* Thinking */
+.thinking-row {
+  display: flex;
+  gap: 0;
+  padding: 0;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+
+.thinking-role {
+  width: 80px;
+  flex-shrink: 0;
+  padding: 18px 0 18px 24px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  text-transform: uppercase;
+  padding-top: 20px;
+}
+
+.thinking-body {
+  flex: 1;
+  padding: 20px 24px 20px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+
+.pulse-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.pulse-dots span {
+  width: 3px;
+  height: 3px;
+  background: var(--muted);
+  animation: pulse 1.4s infinite;
+  display: block;
+}
+.pulse-dots span:nth-child(2) { animation-delay: 0.2s; }
+.pulse-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes pulse {
+  0%, 80%, 100% { opacity: 0.2; }
+  40% { opacity: 1; }
+}
+
+/* ── Input area ──────────────────────────────────────────────────────────────── */
+#input-area {
+  border-top: 1px solid var(--line);
+  background: var(--black);
+  flex-shrink: 0;
+}
+
+.input-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+}
+
+.input-role {
+  width: 80px;
+  flex-shrink: 0;
+  padding: 16px 0 16px 24px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  text-transform: uppercase;
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 19px;
+}
+
+#msg-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  resize: none;
+  max-height: 140px;
+  line-height: 1.6;
+  padding: 16px 0;
+}
+
+#msg-input::placeholder {
+  color: var(--muted);
+}
+
+.send-btn {
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: 1px solid var(--line2);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-bottom: 12px;
+  margin-right: 24px;
+  transition: all 0.15s;
+}
+.send-btn:hover { border-color: var(--white); color: var(--white); }
+.send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.input-hints {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 24px 10px 80px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.cmd-hint {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  transition: all 0.1s;
+}
+.cmd-hint:hover { border-color: var(--line2); color: var(--dim); }
+
+.hints-spacer { flex: 1; }
+
+.hints-note {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+/* ── Memory Modal ────────────────────────────────────────────────────────────── */
+#modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+#modal-overlay.open { display: flex; }
+
+#modal {
+  background: var(--surface);
+  border: 1px solid var(--line2);
+  padding: 28px;
+  width: 480px;
+  max-width: 90vw;
+  position: relative;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.modal-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--white);
+  text-transform: uppercase;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px;
+  transition: color 0.1s;
+}
+.modal-close:hover { color: var(--white); }
+
+.modal-input {
+  width: 100%;
+  background: var(--black);
+  border: 1px solid var(--line2);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 10px 12px;
+  outline: none;
+  margin-bottom: 12px;
+  transition: border-color 0.15s;
+}
+.modal-input:focus { border-color: var(--white); }
+.modal-input::placeholder { color: var(--muted); }
+
+#memory-results {
+  min-height: 60px;
+  margin-bottom: 18px;
+  font-size: 12px;
+  color: var(--muted);
+  font-family: var(--mono);
+  line-height: 1.6;
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  background: var(--black);
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.modal-divider {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 18px 0;
+}
+
+.modal-btns {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.mbtn {
+  height: 30px;
+  padding: 0 16px;
+  border: 1px solid var(--line2);
+  background: transparent;
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.mbtn:hover { color: var(--white); border-color: var(--white); }
+.mbtn-primary {
+  border-color: var(--white);
+  color: var(--white);
+}
+
+@media (max-width: 680px) {
+  #sidebar { display: none; }
+  .msg-role, .thinking-role, .input-role { width: 0; padding-left: 0; display: none; }
+  .msg-body { padding: 14px 16px; }
+  #input-area { padding: 0 16px; }
+  .input-hints { padding-left: 16px; }
+  .starters-grid { grid-template-columns: 1fr 1fr; }
+  .pods-grid { grid-template-columns: repeat(3, 1fr); }
+  .welcome-wordmark { font-size: 34px; }
+}
+/* ── Mode toggle ─────────────────────────────────────────────────────────── */
+.mode-toggle {
+  display: flex;
+  gap: 1px;
+  border: 1px solid var(--line2);
+  margin-right: 10px;
+}
+.mode-btn {
+  padding: 5px 14px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.mode-btn.active {
+  color: var(--white);
+  background: var(--surface3);
+}
+.mode-btn:hover:not(.active) { color: var(--mid); background: var(--surface2); }
+
+/* ── Pod panel (Ultra mode) ──────────────────────────────────────────────── */
+#pod-panel {
+  border-bottom: 1px solid var(--line);
+  padding: 10px 24px;
+  background: var(--surface);
+  display: none;
+}
+#pod-panel.visible { display: block; }
+.pod-panel-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.pod-agents-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.pod-agent-pill {
+  padding: 3px 9px;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  border: 1px solid var(--line2);
+  transition: all 0.2s;
+}
+.pod-agent-pill.active {
+  color: var(--white);
+  border-color: var(--mid);
+  background: var(--surface3);
+}
+.pod-agent-pill.done {
+  color: var(--dim);
+  border-color: var(--line);
+}
+.pod-log {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--dim);
+  line-height: 1.6;
+  max-height: 60px;
+  overflow-y: auto;
+  letter-spacing: 0.02em;
+}
+
+/* ── Grade badge ─────────────────────────────────────────────────────────── */
+.grade-badge {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 3px 8px;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+  border: 1px solid var(--line2);
+}
+.grade-badge.high { color: var(--white); border-color: var(--mid); }
+.grade-badge.low  { color: var(--dim); }
+
+/* ── Auth overlay ────────────────────────────────────────────────────────── */
+#auth-overlay {
+  position: fixed; inset: 0;
+  background: #000;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9000;
+}
+#auth-overlay.hidden { display: none; }
+
+.auth-box {
+  width: 360px;
+  border: 1px solid var(--line2);
+  background: var(--surface);
+  padding: 40px 36px;
+}
+
+.auth-brand {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.auth-wordmark {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.4em;
+  color: var(--white);
+  text-transform: uppercase;
+  padding-right: 0.4em;
+}
+.auth-tagline {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 1px;
+  border: 1px solid var(--line2);
+  margin-bottom: 24px;
+}
+.auth-tab {
+  flex: 1; padding: 7px;
+  font-family: var(--mono); font-size: 9px;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--muted); background: transparent;
+  border: none; cursor: pointer; transition: all 0.15s;
+}
+.auth-tab.active { color: var(--white); background: var(--surface3); }
+.auth-tab:hover:not(.active) { color: var(--mid); }
+
+.auth-field { margin-bottom: 14px; }
+.auth-label {
+  display: block; font-family: var(--mono);
+  font-size: 9px; letter-spacing: 0.14em;
+  color: var(--muted); text-transform: uppercase; margin-bottom: 6px;
+}
+.auth-input {
+  width: 100%; height: 38px; padding: 0 12px;
+  background: var(--surface2); border: 1px solid var(--line2);
+  color: var(--text); font-family: var(--mono); font-size: 12px;
+  outline: none; transition: border-color 0.15s;
+}
+.auth-input:focus { border-color: var(--mid); }
+.auth-input::placeholder { color: var(--muted); }
+
+.auth-btn {
+  width: 100%; height: 40px; margin-top: 8px;
+  background: var(--white); color: var(--black);
+  border: none; font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  cursor: pointer; font-weight: 600; transition: opacity 0.15s;
+}
+.auth-btn:hover { opacity: 0.88; }
+.auth-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.auth-error {
+  font-family: var(--mono); font-size: 10px; color: #e05555;
+  margin-top: 10px; min-height: 16px; text-align: center;
+}
+.auth-switch {
+  font-family: var(--mono); font-size: 9px; color: var(--muted);
+  text-align: center; margin-top: 16px; letter-spacing: 0.05em;
+}
+.auth-switch span {
+  color: var(--mid); cursor: pointer; text-decoration: underline;
+}
+.auth-switch span:hover { color: var(--white); }
+
+/* ── Usage bar ───────────────────────────────────────────────────────────── */
+.usage-bar-wrap {
+  margin-top: 8px;
+}
+.usage-bar-track {
+  height: 2px; background: var(--line); margin-top: 4px;
+}
+.usage-bar-fill {
+  height: 100%; background: var(--white);
+  transition: width 0.4s ease;
+}
+
+/* ── User chip (header) ──────────────────────────────────────────────────── */
+#user-chip {
+  display: none;
+  align-items: center; gap: 7px;
+  height: 28px; padding: 0 12px;
+  border: 1px solid var(--line2);
+  font-family: var(--mono); font-size: 9px;
+  letter-spacing: 0.08em; color: var(--dim);
+  cursor: pointer; transition: all 0.15s;
+}
+#user-chip:hover { color: var(--white); border-color: var(--mid); }
+#user-chip.visible { display: flex; }
+
+/* ── Settings modal ──────────────────────────────────────────────────────── */
+#settings-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.88);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 8000;
+}
+#settings-overlay.hidden { display: none; }
+
+#settings-panel {
+  width: 640px; max-width: 94vw; max-height: 88vh;
+  background: var(--surface); border: 1px solid var(--line2);
+  display: flex; flex-direction: column;
+}
+
+.settings-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 24px; border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.settings-title {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.22em;
+  color: var(--white); text-transform: uppercase;
+}
+
+.settings-close {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 18px; line-height: 1; padding: 2px 4px; transition: color 0.1s;
+}
+.settings-close:hover { color: var(--white); }
+
+.settings-tabs {
+  display: flex; gap: 1px; padding: 14px 24px 0;
+  flex-shrink: 0; border-bottom: 1px solid var(--line);
+}
+
+.stab {
+  padding: 6px 16px 10px; font-family: var(--mono); font-size: 9px;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted);
+  background: transparent; border: none; cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: all 0.1s;
+}
+.stab:hover { color: var(--text); }
+.stab.active { color: var(--white); border-bottom-color: var(--white); }
+
+.settings-body {
+  flex: 1; overflow-y: auto; padding: 24px;
+}
+
+.settings-section {
+  margin-bottom: 28px;
+}
+.settings-section-title {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.2em;
+  color: var(--muted); text-transform: uppercase; margin-bottom: 12px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--line);
+}
+
+.settings-field { margin-bottom: 12px; }
+.settings-label {
+  display: block; font-family: var(--mono); font-size: 9px;
+  letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.settings-input {
+  width: 100%; height: 36px; padding: 0 12px;
+  background: var(--surface2); border: 1px solid var(--line2);
+  color: var(--text); font-family: var(--mono); font-size: 12px;
+  outline: none; transition: border-color 0.15s;
+}
+.settings-input:focus { border-color: var(--mid); }
+
+.settings-btn {
+  height: 34px; padding: 0 18px; border: 1px solid var(--line2);
+  background: transparent; color: var(--dim); font-family: var(--mono);
+  font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+  cursor: pointer; transition: all 0.15s;
+}
+.settings-btn:hover { color: var(--white); border-color: var(--white); }
+.settings-btn.danger { border-color: #6b2222; color: #c05555; }
+.settings-btn.danger:hover { border-color: #c05555; color: #ff7777; }
+.settings-btn.primary { border-color: var(--white); color: var(--white); }
+
+.plan-chip {
+  display: inline-block; padding: 3px 10px; font-family: var(--mono);
+  font-size: 9px; letter-spacing: 0.14em; border: 1px solid var(--line2);
+  color: var(--dim); text-transform: uppercase; margin-left: 8px;
+}
+.plan-chip.pro { color: var(--white); border-color: var(--mid); }
+
+/* API keys */
+.apikey-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--line);
+}
+.apikey-row.revoked { opacity: 0.4; }
+.apikey-info { flex: 1; }
+.apikey-name { font-size: 13px; color: var(--text); margin-bottom: 3px; }
+.apikey-meta { font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: 0.05em; }
+.apikey-tag {
+  font-family: var(--mono); font-size: 8px; color: var(--muted);
+  border: 1px solid var(--line2); padding: 2px 6px; letter-spacing: 0.1em;
+}
+.key-revoke-btn {
+  font-family: var(--mono); font-size: 8px; letter-spacing: 0.12em;
+  padding: 3px 10px; border: 1px solid #6b2222; background: transparent;
+  color: #c05555; cursor: pointer; transition: all 0.15s; flex-shrink: 0;
+}
+.key-revoke-btn:hover { border-color: #c05555; color: #ff7777; }
+
+.new-key-box {
+  display: flex; gap: 8px; margin-top: 12px; padding: 10px 12px;
+  background: var(--surface3); border: 1px solid var(--line2);
+}
+.new-key-input {
+  flex: 1; background: transparent; border: none; color: var(--white);
+  font-family: var(--mono); font-size: 11px; outline: none; min-width: 0;
+}
+
+/* Admin table */
+.admin-table { width: 100%; border-collapse: collapse; }
+.admin-table th {
+  font-family: var(--mono); font-size: 8px; letter-spacing: 0.14em;
+  color: var(--muted); text-transform: uppercase; text-align: left;
+  padding: 6px 8px; border-bottom: 1px solid var(--line2); font-weight: 400;
+}
+.atd { padding: 8px 8px; font-size: 12px; border-bottom: 1px solid var(--line); }
+.atd-muted { color: var(--muted); font-size: 10px; font-family: var(--mono); }
+.admin-select {
+  background: var(--surface2); border: 1px solid var(--line2); color: var(--text);
+  font-family: var(--mono); font-size: 9px; padding: 2px 6px; outline: none;
+  cursor: pointer;
+}
+.admin-select:focus { border-color: var(--mid); }
+.admin-loading { color: var(--muted); font-family: var(--mono); font-size: 11px; padding: 16px 0; }
+.audit-row {
+  display: flex; gap: 12px; align-items: baseline;
+  padding: 5px 0; border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 10px;
+}
+.audit-event { color: var(--text); flex: 1; }
+.audit-uid { color: var(--muted); font-size: 9px; }
+.audit-time { color: var(--muted); font-size: 9px; white-space: nowrap; }
+.admin-stats-bar {
+  display: flex; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--line);
+  margin-bottom: 16px; font-family: var(--mono); font-size: 10px; flex-wrap: wrap;
+}
+.astat { color: var(--muted); }
+.astat b { color: var(--white); font-weight: 500; }
+.empty-text { color: var(--muted); font-family: var(--mono); font-size: 11px; padding: 16px 0; }
+
+/* ── Upgrade modal ────────────────────────────────────────────────────────── */
+#upgrade-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.88);
+  display: flex; align-items: center; justify-content: center; z-index: 8500;
+}
+#upgrade-overlay.hidden { display: none; }
+.upgrade-panel {
+  width: 460px; max-width: 94vw; background: var(--surface);
+  border: 1px solid var(--line2); padding: 36px;
+}
+.upgrade-title {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.24em;
+  color: var(--white); text-transform: uppercase; margin-bottom: 6px;
+}
+.upgrade-sub {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em;
+  color: var(--muted); margin-bottom: 28px;
+}
+.plan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); margin-bottom: 24px; }
+.plan-col { background: var(--surface); padding: 16px; }
+.plan-col.current { background: var(--surface2); }
+.plan-name {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.2em;
+  color: var(--muted); text-transform: uppercase; margin-bottom: 8px;
+}
+.plan-price {
+  font-family: var(--mono); font-size: 20px; color: var(--white); margin-bottom: 12px;
+}
+.plan-price span { font-size: 11px; color: var(--muted); }
+.plan-features { list-style: none; padding: 0; margin: 0; }
+.plan-features li {
+  font-size: 11px; color: var(--muted); padding: 3px 0;
+  font-family: var(--mono); letter-spacing: 0.02em;
+}
+.plan-features li::before { content: "✓  "; color: var(--dim); }
+.plan-features li.pro-only::before { color: var(--white); }
+.plan-features li.pro-only { color: var(--text); }
+.upgrade-btn {
+  width: 100%; height: 44px; background: var(--white); color: var(--black);
+  border: none; font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em;
+  text-transform: uppercase; font-weight: 700; cursor: pointer;
+  transition: opacity 0.15s; margin-bottom: 10px;
+}
+.upgrade-btn:hover { opacity: 0.88; }
+.upgrade-close-link {
+  display: block; text-align: center; font-family: var(--mono); font-size: 9px;
+  color: var(--muted); cursor: pointer; letter-spacing: 0.08em;
+}
+.upgrade-close-link:hover { color: var(--white); }
+
+/* ── Unverified banner ────────────────────────────────────────────────────── */
+#verify-banner {
+  display: none; align-items: center; justify-content: center; gap: 12px;
+  padding: 7px 16px; background: var(--surface2);
+  border-bottom: 1px solid var(--line2); flex-shrink: 0;
+  font-family: var(--mono); font-size: 10px; color: var(--muted);
+  letter-spacing: 0.06em;
+}
+#verify-banner.visible { display: flex; }
+#verify-banner a { color: var(--white); cursor: pointer; }
+
+/* ── Model variant selector (input bar) ──────────────────────────────────── */
+.model-pills {
+  display: flex;
+  gap: 1px;
+  border: 1px solid var(--line2);
+  margin-left: 10px;
+  flex-shrink: 0;
+}
+.mpill {
+  padding: 2px 10px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.1s;
+  background: transparent;
+  border: none;
+  user-select: none;
+}
+.mpill.active { color: var(--white); background: var(--surface3); }
+.mpill:hover:not(.active):not(.mpill-unavail) { color: var(--mid); background: var(--surface2); }
+.mpill-unavail { opacity: 0.28; cursor: not-allowed; }
+.mpill-unavail:hover { color: var(--muted) !important; background: transparent !important; }
+</style>
+</head>
+<body>
+
+<!-- Auth Overlay -->
+<div id="auth-overlay">
+  <div class="auth-box">
+    <div class="auth-brand">
+      <div class="auth-wordmark">ATHERIS</div>
+      <div class="auth-tagline">Private Intelligence &nbsp;/&nbsp; Powered by Orca</div>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-signin" onclick="switchAuthTab('signin')">Sign In</button>
+      <button class="auth-tab" id="tab-signup" onclick="switchAuthTab('signup')">Sign Up</button>
+    </div>
+    <!-- Sign In -->
+    <div id="form-signin">
+      <div class="auth-field">
+        <label class="auth-label">Email</label>
+        <input class="auth-input" id="si-email" type="email" placeholder="you@example.com" autocomplete="email"/>
+      </div>
+      <div class="auth-field">
+        <label class="auth-label">Password</label>
+        <input class="auth-input" id="si-password" type="password" placeholder="••••••••" autocomplete="current-password"/>
+      </div>
+      <button class="auth-btn" id="si-btn" onclick="doLogin()">Sign In</button>
+      <div class="auth-error" id="si-error"></div>
+      <div class="auth-switch">No account? <span onclick="switchAuthTab('signup')">Sign up free</span></div>
+      <div class="auth-switch" style="margin-top:8px"><span onclick="switchAuthTab('forgot')" style="color:var(--muted);text-decoration:none;font-size:9px">Forgot password?</span></div>
+    </div>
+    <!-- Sign Up -->
+    <div id="form-signup" style="display:none">
+      <div class="auth-field">
+        <label class="auth-label">Name</label>
+        <input class="auth-input" id="su-name" type="text" placeholder="Your name" autocomplete="name"/>
+      </div>
+      <div class="auth-field">
+        <label class="auth-label">Email</label>
+        <input class="auth-input" id="su-email" type="email" placeholder="you@example.com" autocomplete="email"/>
+      </div>
+      <div class="auth-field">
+        <label class="auth-label">Password</label>
+        <input class="auth-input" id="su-password" type="password" placeholder="Min 8 characters" autocomplete="new-password"/>
+      </div>
+      <button class="auth-btn" id="su-btn" onclick="doSignup()">Create Account</button>
+      <div class="auth-error" id="su-error"></div>
+      <div class="auth-switch">Have an account? <span onclick="switchAuthTab('signin')">Sign in</span></div>
+    </div>
+    <!-- Forgot Password -->
+    <div id="form-forgot" style="display:none">
+      <div class="auth-field">
+        <label class="auth-label">Email</label>
+        <input class="auth-input" id="fp-email" type="email" placeholder="you@example.com"/>
+      </div>
+      <button class="auth-btn" id="fp-btn" onclick="doForgotPassword()">Send Reset Link</button>
+      <div class="auth-error" id="fp-error"></div>
+      <div class="auth-switch">Remember it? <span onclick="switchAuthTab('signin')">Sign in</span></div>
+    </div>
+    <!-- Check Email -->
+    <div id="form-check-email" style="display:none">
+      <div style="text-align:center;padding:20px 0 24px">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--dim)" stroke-width="1" style="margin-bottom:16px">
+          <rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="2 4 12 13 22 4"/>
+        </svg>
+        <div id="check-email-msg" style="color:var(--text);font-size:13px;line-height:1.6;margin-bottom:8px">Check your email for a link.</div>
+        <div style="font-size:11px;color:var(--muted)">It may take a minute to arrive.</div>
+      </div>
+      <button class="auth-btn" onclick="switchAuthTab('signin')">Back to Sign In</button>
+    </div>
+    <!-- Reset Password -->
+    <div id="form-reset" style="display:none">
+      <div class="auth-field">
+        <label class="auth-label">New Password</label>
+        <input class="auth-input" id="rp-password" type="password" placeholder="Min 8 characters"/>
+      </div>
+      <div class="auth-field">
+        <label class="auth-label">Confirm Password</label>
+        <input class="auth-input" id="rp-confirm" type="password" placeholder="Confirm password"/>
+      </div>
+      <button class="auth-btn" id="rp-btn" onclick="doResetPassword()">Set New Password</button>
+      <div class="auth-error" id="rp-error"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Unverified email banner -->
+<div id="verify-banner">
+  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2">
+    <circle cx="8" cy="8" r="6.5"/><line x1="8" y1="5" x2="8" y2="9"/><circle cx="8" cy="11" r=".5" fill="currentColor"/>
+  </svg>
+  Verify your email to unlock all features.
+  <a onclick="resendVerification()">Resend link</a>
+  &nbsp;·&nbsp;
+  <a onclick="document.getElementById('verify-banner').classList.remove('visible')">Dismiss</a>
+</div>
+
+<!-- Header -->
+<header id="header">
+  <div class="logo-mark">
+    <!-- Orca SVG mark -->
+    <svg class="logo-icon" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 20 Q8 8 14 10 Q18 11 20 8 Q22 5 24 7 Q20 9 19 13 Q18 17 22 18 Q16 22 12 20 Q8 22 4 20Z" fill="#fff" opacity="0.9"/>
+      <path d="M4 20 Q6 24 10 23 Q8 21 8 19Z" fill="#fff" opacity="0.5"/>
+      <circle cx="20" cy="9" r="1" fill="#fff" opacity="0.6"/>
+    </svg>
+    <div>
+      <div class="logo-text">ATHERIS</div>
+      <div class="logo-ver">VER 1.0.0 &nbsp;/&nbsp; ATHERIS.AI</div>
+    </div>
+  </div>
+
+  <div class="header-center">
+    <div class="status-item">
+      <div class="status-pip" id="status-pip"></div>
+      <span id="status-label">CONNECTING</span>
+    </div>
+    <div class="status-item" style="color: var(--muted)">
+      MODEL&nbsp;<span id="hdr-model" style="color:var(--dim)">—</span>
+    </div>
+  </div>
+
+  <div class="mode-toggle">
+    <button class="mode-btn active" id="mode-core" onclick="setMode('core')">CORE</button>
+    <button class="mode-btn" id="mode-ultra" onclick="setMode('ultra')">ULTRA</button>
+  </div>
+
+  <div class="header-actions">
+    <button class="hbtn" onclick="openMemoryModal()">
+      <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.2"/>
+        <path d="M5.5 8.5C5.5 6.8 6.6 5.5 8 5.5S10.5 6.8 10.5 8.5" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="8" y1="8.5" x2="8" y2="11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+      MEMORY
+    </button>
+    <button class="hbtn" onclick="exportConversation()" id="export-btn" title="Export conversation as Markdown">
+      <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+        <path d="M13 9v4H3V9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="8" y1="2" x2="8" y2="10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        <polyline points="5 7 8 10 11 7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      EXPORT
+    </button>
+    <button class="hbtn" onclick="newChat()">
+      <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+        <line x1="8" y1="2" x2="8" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="2" y1="8" x2="14" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      NEW SESSION
+    </button>
+    <div id="user-chip" onclick="showUserMenu()">
+      <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="5.5" r="3" stroke="currentColor" stroke-width="1.2"/>
+        <path d="M2 13.5c0-2.5 2.7-4 6-4s6 1.5 6 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+      <span id="user-chip-label">—</span>
+    </div>
+  </div>
+</header>
+
+<!-- Layout -->
+<div id="layout">
+
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="sidebar-top">
+      <button class="new-btn" onclick="newChat()">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+          <line x1="8" y1="2" x2="8" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="2" y1="8" x2="14" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        NEW CONVERSATION
+      </button>
+    </div>
+
+    <div class="sidebar-label">Sessions</div>
+    <div id="session-list">
+      <div class="sess-item" style="color:var(--muted);cursor:default">No sessions yet</div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="stat-row">
+        <span>Training data</span>
+        <span class="stat-val" id="stat-examples">—</span>
+      </div>
+      <div class="stat-row">
+        <span>Model</span>
+        <span class="stat-val" id="stat-model" style="font-size:8px">—</span>
+      </div>
+      <div class="stat-row">
+        <span>Sessions</span>
+        <span class="stat-val" id="stat-sessions">—</span>
+      </div>
+      <div class="stat-row" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--line)">
+        <span>License</span>
+        <span class="stat-val" id="stat-license" style="font-size:8px">FREE</span>
+      </div>
+      <div class="usage-bar-wrap" id="usage-bar-wrap" style="display:none">
+        <div class="stat-row" style="margin-top:8px">
+          <span>Messages today</span>
+          <span class="stat-val" id="usage-label">0/50</span>
+        </div>
+        <div class="usage-bar-track">
+          <div class="usage-bar-fill" id="usage-bar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Chat -->
+  <div id="chat-area">
+    <div id="messages">
+      <!-- Welcome screen -->
+      <div id="welcome">
+
+        <div class="welcome-brand">
+          <div class="welcome-wordmark">ATHERIS</div>
+          <div class="welcome-tagline">Private Intelligence &nbsp;/&nbsp; Powered by Orca &nbsp;/&nbsp; 100% Local</div>
+        </div>
+
+        <!-- Sub-agent pods -->
+        <div class="pods-section">
+          <div class="pods-label">
+            <div class="pods-label-line"></div>
+            <div class="pods-label-text">Sub-Agent Pods</div>
+            <div class="pods-label-line"></div>
+          </div>
+          <div class="pods-grid">
+            <div class="pod" onclick="sendStarter('Research the AI assistant market and find VCs who invest in developer tools and private AI.')">
+              <svg class="pod-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
+                <circle cx="11" cy="11" r="7"/>
+                <line x1="16.5" y1="16.5" x2="21" y2="21"/>
+              </svg>
+              <div class="pod-name">ATHERIS<br>RESEARCH</div>
+            </div>
+            <div class="pod" onclick="sendStarter('Write a Python function to fetch and parse JSON from an API endpoint with error handling.')">
+              <svg class="pod-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
+                <polyline points="16 18 22 12 16 6"/>
+                <polyline points="8 6 2 12 8 18"/>
+              </svg>
+              <div class="pod-name">ATHERIS<br>CODE</div>
+            </div>
+            <div class="pod" onclick="sendStarter('Analyze the competitive landscape for private AI assistants and identify the biggest market opportunity.')">
+              <svg class="pod-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
+                <line x1="18" y1="20" x2="18" y2="10"/>
+                <line x1="12" y1="20" x2="12" y2="4"/>
+                <line x1="6" y1="20" x2="6" y2="14"/>
+              </svg>
+              <div class="pod-name">ATHERIS<br>ANALYST</div>
+            </div>
+            <div class="pod" onclick="sendStarter('Write a concise, compelling one-page pitch for Orca — a private self-owned AI system.')">
+              <svg class="pod-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+              <div class="pod-name">ATHERIS<br>WRITER</div>
+            </div>
+            <div class="pod" onclick="sendStarter('Critically review my business model for Orca and identify the weakest points an investor would challenge.')">
+              <svg class="pod-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
+                <circle cx="12" cy="12" r="9"/>
+                <circle cx="12" cy="12" r="4"/>
+                <line x1="12" y1="3" x2="12" y2="1"/>
+                <line x1="12" y1="23" x2="12" y2="21"/>
+                <line x1="3" y1="12" x2="1" y2="12"/>
+                <line x1="23" y1="12" x2="21" y2="12"/>
+              </svg>
+              <div class="pod-name">ATHERIS<br>CRITIC</div>
+            </div>
+            <div class="pod" onclick="sendStarter('Design the technical architecture for a scalable private AI platform that can be sold to enterprises.')">
+              <svg class="pod-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
+                <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/>
+                <line x1="12" y1="2" x2="12" y2="22"/>
+                <line x1="2" y1="8.5" x2="22" y2="8.5"/>
+                <line x1="2" y1="15.5" x2="22" y2="15.5"/>
+              </svg>
+              <div class="pod-name">ATHERIS<br>ARCHITECT</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Starter prompts -->
+        <div class="starters-grid">
+          <div class="starter" onclick="sendStarter('Research pre-seed AI investors who fund developer tools and private AI. Give me names, fund sizes, and how to approach them.')">
+            <svg class="starter-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2">
+              <circle cx="8" cy="6" r="3"/>
+              <path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
+            </svg>
+            <div class="starter-title">Find investors</div>
+            <div class="starter-desc">VCs and angels for private AI infrastructure</div>
+          </div>
+          <div class="starter" onclick="sendStarter('Write an investor elevator pitch for Orca. 60 seconds, crisp, specific. Lead with the problem, show the moat.')">
+            <svg class="starter-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2">
+              <polygon points="8 1 10 6 15 6 11 9.5 12.5 15 8 12 3.5 15 5 9.5 1 6 6 6"/>
+            </svg>
+            <div class="starter-title">Write pitch</div>
+            <div class="starter-desc">Investor-ready elevator pitch</div>
+          </div>
+          <div class="starter" onclick="sendStarter('What is the best go-to-market strategy for Orca targeting privacy-conscious professionals: lawyers, doctors, executives?')">
+            <svg class="starter-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2">
+              <polyline points="1 11 5 7 9 9 15 3"/>
+              <polyline points="11 3 15 3 15 7"/>
+            </svg>
+            <div class="starter-title">Go-to-market</div>
+            <div class="starter-desc">Revenue and acquisition strategy</div>
+          </div>
+          <div class="starter" onclick="sendStarter('Design a pricing model for Orca. What tiers should I offer, what should each cost, and why?')">
+            <svg class="starter-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2">
+              <rect x="1" y="4" width="14" height="9" rx="1"/>
+              <line x1="1" y1="7" x2="15" y2="7"/>
+              <line x1="5" y1="7" x2="5" y2="13"/>
+            </svg>
+            <div class="starter-title">Pricing model</div>
+            <div class="starter-desc">Monetization tiers and strategy</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Input -->
+    <!-- Ultra pod panel — visible only during multi-agent runs -->
+    <div id="pod-panel">
+      <div class="pod-panel-label">POD ACTIVE — MULTI-AGENT PIPELINE</div>
+      <div class="pod-agents-row">
+        <div class="pod-agent-pill" id="pill-researcher">RESEARCH</div>
+        <div class="pod-agent-pill" id="pill-coder">CODE</div>
+        <div class="pod-agent-pill" id="pill-analyst">ANALYST</div>
+        <div class="pod-agent-pill" id="pill-writer">WRITER</div>
+        <div class="pod-agent-pill" id="pill-critic">CRITIC</div>
+        <div class="pod-agent-pill" id="pill-architect">ARCHITECT</div>
+      </div>
+      <div class="pod-log" id="pod-log"></div>
+    </div>
+
+    <div id="input-area">
+      <div class="input-inner">
+        <div class="input-role">YOU</div>
+        <textarea id="msg-input" placeholder="Send a message to Atheris..." rows="1"
+          oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
+        <button class="send-btn" id="send-btn" onclick="sendMessage()" title="Send (Enter)">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <line x1="8" y1="14" x2="8" y2="2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <polyline points="3 7 8 2 13 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="input-hints">
+        <span class="cmd-hint" onclick="insertCmd('/web ')">/web</span>
+        <span class="cmd-hint" onclick="insertCmd('/run ')">/run</span>
+        <span class="cmd-hint" onclick="insertCmd('/remember ')">/remember</span>
+        <span class="cmd-hint" onclick="insertCmd('/recall ')">/recall</span>
+        <div class="model-pills">
+          <span class="mpill" id="mpill-nano" onclick="setModelVariant('nano')">NANO</span>
+          <span class="mpill active" id="mpill-core" onclick="setModelVariant('core')">CORE</span>
+          <span class="mpill" id="mpill-ultra-m" onclick="setModelVariant('ultra')">ULTRA</span>
+        </div>
+        <span class="hints-spacer"></span>
+        <span class="hints-note">ENTER TO SEND &nbsp;&middot;&nbsp; SHIFT+ENTER FOR NEWLINE</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Memory Modal -->
+<div id="modal-overlay">
+  <div id="modal" class="bracketed">
+    <div class="modal-header">
+      <div class="modal-title">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" style="margin-right:8px;vertical-align:middle">
+          <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.2"/>
+          <path d="M5.5 8.5C5.5 6.8 6.6 5.5 8 5.5S10.5 6.8 10.5 8.5" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="8" y1="8.5" x2="8" y2="11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+        MEMORY VAULT
+      </div>
+      <button class="modal-close" onclick="closeMemoryModal()">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <line x1="2" y1="2" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="14" y1="2" x2="2" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <input class="modal-input" id="memory-query" placeholder="SEARCH MEMORY..." onkeydown="if(event.key==='Enter') searchMemory()">
+    <div id="memory-results">— no query —</div>
+
+    <hr class="modal-divider">
+
+    <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.18em;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Store a fact permanently</div>
+    <input class="modal-input" id="remember-input" placeholder="e.g. MY TARGET MARKET IS PRIVACY-CONSCIOUS EXECUTIVES">
+    <div class="modal-btns">
+      <button class="mbtn" onclick="closeMemoryModal()">CLOSE</button>
+      <button class="mbtn" onclick="searchMemory()">SEARCH</button>
+      <button class="mbtn mbtn-primary" onclick="storeMemory()">REMEMBER</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settings-overlay" class="hidden">
+  <div id="settings-panel">
+    <div class="settings-header">
+      <div class="settings-title">Settings</div>
+      <button class="settings-close" onclick="closeSettings()">&#x2715;</button>
+    </div>
+    <div class="settings-tabs">
+      <button class="stab active" id="stab-btn-account" onclick="switchSettingsTab('account')">Account</button>
+      <button class="stab" id="stab-btn-apikeys" onclick="switchSettingsTab('apikeys')">API Keys</button>
+      <button class="stab" id="stab-btn-admin" style="display:none" onclick="switchSettingsTab('admin')">Admin</button>
+    </div>
+    <div class="settings-body">
+
+      <!-- Account tab -->
+      <div id="stab-panel-account">
+        <div class="settings-section">
+          <div class="settings-section-title">Profile</div>
+          <div class="settings-field">
+            <label class="settings-label">Name</label>
+            <div id="profile-name" style="font-size:13px;color:var(--text);padding:8px 0">—</div>
+          </div>
+          <div class="settings-field">
+            <label class="settings-label">Email</label>
+            <div id="profile-email" style="font-size:13px;color:var(--text);padding:8px 0">—</div>
+          </div>
+          <div class="settings-field">
+            <label class="settings-label">Plan</label>
+            <div style="padding:8px 0;display:flex;align-items:center;gap:10px">
+              <span id="profile-tier" class="plan-chip">FREE</span>
+              <button class="settings-btn primary" onclick="closeSettings();openUpgrade()" id="upgrade-btn" style="display:none">Upgrade to Pro</button>
+            </div>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">Change Password</div>
+          <div class="settings-field">
+            <label class="settings-label">Current Password</label>
+            <input class="settings-input" id="cp-current" type="password" placeholder="Current password"/>
+          </div>
+          <div class="settings-field">
+            <label class="settings-label">New Password</label>
+            <input class="settings-input" id="cp-new" type="password" placeholder="Min 8 characters"/>
+          </div>
+          <div class="settings-field">
+            <label class="settings-label">Confirm New Password</label>
+            <input class="settings-input" id="cp-confirm" type="password" placeholder="Confirm new password"/>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <button class="settings-btn primary" onclick="doChangePassword()">Update Password</button>
+          </div>
+          <div id="cp-msg" style="font-family:var(--mono);font-size:10px;margin-top:8px;min-height:14px"></div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">Session</div>
+          <button class="settings-btn danger" onclick="doLogout();closeSettings()">Sign Out</button>
+        </div>
+      </div>
+
+      <!-- API Keys tab -->
+      <div id="stab-panel-apikeys" style="display:none">
+        <div class="settings-section">
+          <div class="settings-section-title">Create API Key</div>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <input class="settings-input" id="newkey-name" placeholder="Key name (e.g. Production)" style="flex:1"/>
+            <button class="settings-btn primary" id="create-key-btn" onclick="createApiKey()">Create</button>
+          </div>
+          <div id="new-key-box" style="display:none" class="new-key-box">
+            <input class="new-key-input" id="new-key-display" readonly/>
+            <button class="settings-btn" id="copy-key-btn" onclick="copyApiKey()">COPY</button>
+          </div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:6px">
+            Copy your key now — it won't be shown again.
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">Your Keys</div>
+          <div id="apikeys-list"><div class="empty-text">Loading...</div></div>
+        </div>
+      </div>
+
+      <!-- Admin tab -->
+      <div id="stab-panel-admin" style="display:none">
+        <div class="settings-section">
+          <div id="admin-stats" class="admin-stats-bar"></div>
+          <div class="settings-section-title" style="margin-top:0">Users</div>
+          <div style="overflow-x:auto">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Email</th><th>Name</th><th>Tier</th><th>Role</th><th>Joined</th>
+                </tr>
+              </thead>
+              <tbody id="admin-users-tbody">
+                <tr><td colspan="5" class="admin-loading">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">Audit Log <span style="color:var(--muted)">(last 50)</span></div>
+          <div id="admin-audit-list"><div class="admin-loading">Loading...</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Upgrade Modal -->
+<div id="upgrade-overlay" class="hidden">
+  <div class="upgrade-panel">
+    <div class="upgrade-title">Upgrade to Pro</div>
+    <div class="upgrade-sub">Unlock unlimited messages and advanced features</div>
+    <div class="plan-grid">
+      <div class="plan-col current">
+        <div class="plan-name">Free</div>
+        <div class="plan-price">$0 <span>/mo</span></div>
+        <ul class="plan-features">
+          <li>50 messages/day</li>
+          <li>3 Ultra runs/day</li>
+          <li>Memory vault</li>
+          <li>Session history</li>
+        </ul>
+      </div>
+      <div class="plan-col">
+        <div class="plan-name">Pro</div>
+        <div class="plan-price">$20 <span>/mo</span></div>
+        <ul class="plan-features">
+          <li class="pro-only">Unlimited messages</li>
+          <li class="pro-only">50 Ultra runs/day</li>
+          <li class="pro-only">API key access</li>
+          <li class="pro-only">Priority support</li>
+        </ul>
+      </div>
+    </div>
+    <button class="upgrade-btn" onclick="goToCheckout()">Upgrade Now</button>
+    <span class="upgrade-close-link" onclick="closeUpgrade()">Maybe later</span>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let sessionId = null;
+let isStreaming = false;
+let rawBuffer = '';
+let currentMode = 'core';
+let currentModelVariant = 'core';
+let _firstMessageInSession = null;
+
+function setModelVariant(v) {
+  currentModelVariant = v;
+  ['nano', 'core', 'ultra-m'].forEach(id => {
+    const el = document.getElementById('mpill-' + id);
+    if (el) el.classList.toggle('active', (id === 'ultra-m' ? 'ultra' : id) === v);
+  });
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('mode-core').classList.toggle('active', mode === 'core');
+  document.getElementById('mode-ultra').classList.toggle('active', mode === 'ultra');
+  const input = document.getElementById('msg-input');
+  input.placeholder = mode === 'ultra'
+    ? 'Give the pod a task...'
+    : 'Send a message to Atheris...';
+}
+
+function _podAgentFromText(text) {
+  const lower = text.toLowerCase();
+  if (lower.includes('researcher') || lower.includes('[researcher]')) return 'researcher';
+  if (lower.includes('coder') || lower.includes('[coder]')) return 'coder';
+  if (lower.includes('analyst') || lower.includes('[analyst]')) return 'analyst';
+  if (lower.includes('writer') || lower.includes('[writer]')) return 'writer';
+  if (lower.includes('critic') || lower.includes('[critic]')) return 'critic';
+  if (lower.includes('architect') || lower.includes('[architect]')) return 'architect';
+  return null;
+}
+
+function showPodPanel() {
+  document.getElementById('pod-panel').classList.add('visible');
+  document.getElementById('pod-log').innerHTML = '';
+  document.querySelectorAll('.pod-agent-pill').forEach(p => {
+    p.classList.remove('active', 'done');
+  });
+}
+
+function hidePodPanel() {
+  document.getElementById('pod-panel').classList.remove('visible');
+}
+
+function updatePodLog(text) {
+  const log = document.getElementById('pod-log');
+  const line = document.createElement('div');
+  line.textContent = '> ' + text.replace(/^\[|\]$/g, '').replace(/\[|\]/g, ' ').trim();
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+
+  // Highlight the matching agent pill
+  const agent = _podAgentFromText(text);
+  if (agent) {
+    const pill = document.getElementById('pill-' + agent);
+    if (pill) {
+      // Mark previously active pills as done
+      document.querySelectorAll('.pod-agent-pill.active').forEach(p => {
+        if (p !== pill) { p.classList.remove('active'); p.classList.add('done'); }
+      });
+      if (text.toLowerCase().includes('done') || text.includes('✓')) {
+        pill.classList.remove('active');
+        pill.classList.add('done');
+      } else {
+        pill.classList.add('active');
+        pill.classList.remove('done');
+      }
+    }
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  pollStatus();
+  pollLicense();
+  loadSessions();
+  checkModelAvailability();
+  setInterval(pollStatus, 15000);
+  setInterval(pollLicense, 60000);
+  setInterval(checkModelAvailability, 30000);
+  document.getElementById('msg-input').focus();
+});
+
+async function pollStatus() {
+  try {
+    const d = await fetch('/api/status').then(r => r.json());
+    const pip = document.getElementById('status-pip');
+    const lbl = document.getElementById('status-label');
+    const hm  = document.getElementById('hdr-model');
+    const sm  = document.getElementById('stat-model');
+    const se  = document.getElementById('stat-examples');
+    const ss  = document.getElementById('stat-sessions');
+
+    if (d.status === 'online') {
+      pip.className = 'status-pip online';
+      lbl.textContent = 'ONLINE';
+      hm.textContent = d.model;
+      sm.textContent = d.model;
+    } else {
+      pip.className = 'status-pip offline';
+      lbl.textContent = 'OFFLINE';
+      hm.textContent = 'ollama not running';
+    }
+    se.textContent = d.training_examples;
+    ss.textContent = d.total_sessions;
+  } catch {
+    document.getElementById('status-pip').className = 'status-pip offline';
+    document.getElementById('status-label').textContent = 'NO CONNECTION';
+  }
+}
+
+async function pollLicense() {
+  try {
+    const d = await fetch('/api/license').then(r => r.json());
+    const badge = document.getElementById('stat-license');
+    const ultraBtn = document.getElementById('mode-ultra');
+
+    // Update sidebar tier badge
+    badge.textContent = d.tier.toUpperCase();
+    badge.style.color = d.valid ? 'var(--white)' : 'var(--dim)';
+
+    // Lock/unlock the ULTRA toggle based on license
+    if (!d.has_ultra) {
+      ultraBtn.disabled = true;
+      ultraBtn.title = 'Ultra requires a Pro license — run: orca activate <key>';
+      ultraBtn.style.opacity = '0.35';
+      ultraBtn.style.cursor = 'not-allowed';
+      // If currently in ultra mode, switch back to core
+      if (currentMode === 'ultra') setMode('core');
+    } else {
+      ultraBtn.disabled = false;
+      ultraBtn.title = '';
+      ultraBtn.style.opacity = '';
+      ultraBtn.style.cursor = '';
+    }
+  } catch { /* non-fatal */ }
+}
+
+async function loadSessions() {
+  try {
+    const d = await fetch('/api/sessions').then(r => r.json());
+    const list = document.getElementById('session-list');
+    const sessions = d.sessions || [];
+    if (!sessions.length) {
+      list.innerHTML = '<div class="sess-item" style="color:var(--muted);cursor:default">No sessions yet</div>';
+      return;
+    }
+    list.innerHTML = sessions.slice(0, 30).map(s => {
+      const sid = typeof s === 'string' ? s : s.id;
+      const title = (typeof s === 'object' && s.title) ? s.title : sid.slice(0,8).toUpperCase();
+      return `
+      <div class="sess-item" data-sid="${sid}" onclick="loadSession('${sid}')">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2">
+          <path d="M14 10a4 4 0 0 1-4 4H4a4 4 0 0 1 0-8h1"/>
+          <path d="M2 6a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v.5"/>
+        </svg>
+        <span class="sess-label">${esc(title)}</span>
+      </div>`;
+    }).join('');
+  } catch {}
+}
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+function newChat() {
+  sessionId = null;
+  const msgs = document.getElementById('messages');
+  msgs.innerHTML = '';
+  msgs.appendChild(buildWelcome());
+  isStreaming = false;
+  document.getElementById('send-btn').disabled = false;
+  document.getElementById('msg-input').focus();
+}
+
+function buildWelcome() {
+  const el = document.createElement('div');
+  el.id = 'welcome';
+  el.innerHTML = document.getElementById('welcome').innerHTML;
+  return el;
+}
+
+function sendStarter(text) {
+  document.getElementById('msg-input').value = text;
+  autoResize(document.getElementById('msg-input'));
+  sendMessage();
+}
+
+function insertCmd(text) {
+  const el = document.getElementById('msg-input');
+  el.value = text;
+  el.focus();
+  autoResize(el);
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+async function sendMessage() {
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  if (!text || isStreaming) return;
+
+  if (text.startsWith('/remember ')) {
+    const fact = text.slice(10).trim();
+    appendUserMsg(text);
+    input.value = ''; autoResize(input);
+    await storeFact(fact);
+    return;
+  }
+
+  removeWelcome();
+  appendUserMsg(text);
+  if (!sessionId) _firstMessageInSession = text;
+  input.value = ''; autoResize(input);
+
+  if (currentMode === 'ultra') {
+    await sendUltra(text);
+    return;
+  }
+
+  isStreaming = true;
+  document.getElementById('send-btn').disabled = true;
+
+  const thinkEl = appendThinking();
+
+  try {
+    const resp = await fetch('/api/stream', {
+      method: 'POST',
+      headers: _authHeaders(),
+      body: JSON.stringify({ message: text, session_id: sessionId, model_variant: currentModelVariant }),
+    });
+
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let orcaEl = null;
+    rawBuffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const lines = dec.decode(value).split('\n');
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const ev = JSON.parse(line.slice(6));
+          if (ev.type === 'session') {
+            sessionId = ev.session_id;
+          } else if (ev.type === 'thinking') {
+            thinkEl.querySelector('.thinking-text').textContent = ev.text.toUpperCase();
+          } else if (ev.type === 'chunk') {
+            if (!orcaEl) {
+              thinkEl.remove();
+              orcaEl = appendOrcaMsg('');
+            }
+            rawBuffer += ev.text;
+            orcaEl.querySelector('.msg-body').innerHTML = mdToHtml(rawBuffer);
+            scrollBottom();
+          } else if (ev.type === 'done') {
+            if (ev.tools && ev.tools.length) {
+              const bar = document.createElement('div');
+              bar.className = 'tool-row';
+              bar.innerHTML = ev.tools.map(t =>
+                `<span class="tool-tag">
+                  <svg width="8" height="8" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <polyline points="4 6 2 8 4 10"/><polyline points="12 6 14 8 12 10"/><line x1="9" y1="4" x2="7" y2="12"/>
+                  </svg>
+                  ${t.toUpperCase()}
+                </span>`
+              ).join('');
+              if (orcaEl) orcaEl.insertAdjacentElement('beforebegin', bar);
+            }
+            if (sessionId && _firstMessageInSession) {
+              autoTitleSession(sessionId, _firstMessageInSession);
+              _firstMessageInSession = null;
+            }
+            loadSessions();
+          } else if (ev.type === 'error') {
+            if (ev.text && ev.text.includes('Daily limit')) { openUpgrade(); }
+            thinkEl.remove();
+            appendOrcaMsg('Error: ' + ev.text);
+          }
+        } catch {}
+      }
+    }
+  } catch(e) {
+    thinkEl.remove();
+    appendOrcaMsg('Connection error: ' + e.message);
+  }
+
+  isStreaming = false;
+  document.getElementById('send-btn').disabled = false;
+  document.getElementById('msg-input').focus();
+}
+
+async function sendUltra(task) {
+  isStreaming = true;
+  document.getElementById('send-btn').disabled = true;
+  showPodPanel();
+
+  let orcaEl = null;
+  rawBuffer = '';
+
+  try {
+    const resp = await fetch('/api/ultra', {
+      method: 'POST',
+      headers: _authHeaders(),
+      body: JSON.stringify({ task, session_id: sessionId, model_variant: currentModelVariant }),
+    });
+
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const parts = buf.split('\n\n');
+      buf = parts.pop();
+
+      for (const part of parts) {
+        if (!part.startsWith('data: ')) continue;
+        try {
+          const ev = JSON.parse(part.slice(6));
+          if (ev.type === 'session') {
+            sessionId = ev.session_id;
+          } else if (ev.type === 'pod_launch') {
+            updatePodLog('Pod launched — decomposing task...');
+          } else if (ev.type === 'progress') {
+            updatePodLog(ev.text);
+          } else if (ev.type === 'chunk') {
+            if (!orcaEl) {
+              hidePodPanel();
+              orcaEl = appendOrcaMsg('');
+            }
+            rawBuffer += ev.text;
+            orcaEl.querySelector('.msg-body').innerHTML = mdToHtml(rawBuffer);
+            scrollBottom();
+          } else if (ev.type === 'done') {
+            const grade = ev.grade || {};
+            const score = grade.score || 0;
+            if (orcaEl) {
+              const badge = document.createElement('div');
+              badge.className = 'grade-badge' + (score >= 80 ? ' high' : score < 65 ? ' low' : '');
+              badge.textContent = `QUALITY ${score}/100  ·  ${ev.iterations || 1} ITERATION${(ev.iterations||1) > 1 ? 'S' : ''}`;
+              orcaEl.appendChild(badge);
+            }
+            hidePodPanel();
+            loadSessions();
+          } else if (ev.type === 'error') {
+            hidePodPanel();
+            appendOrcaMsg('Pod error: ' + ev.text);
+          }
+        } catch {}
+      }
+    }
+  } catch(e) {
+    hidePodPanel();
+    appendOrcaMsg('Ultra connection error: ' + e.message);
+  }
+
+  isStreaming = false;
+  document.getElementById('send-btn').disabled = false;
+  document.getElementById('msg-input').focus();
+}
+
+function removeWelcome() {
+  const w = document.getElementById('welcome');
+  if (w) w.remove();
+}
+
+// ── Rendering ─────────────────────────────────────────────────────────────────
+function appendUserMsg(text) {
+  const el = document.createElement('div');
+  el.className = 'msg-row user-row';
+  el.innerHTML = `
+    <div class="msg-role">YOU</div>
+    <div class="msg-body">${esc(text).replace(/\n/g,'<br>')}</div>
+  `;
+  document.getElementById('messages').appendChild(el);
+  scrollBottom();
+  return el;
+}
+
+function appendOrcaMsg(text) {
+  const el = document.createElement('div');
+  el.className = 'msg-row orca-row';
+  el.innerHTML = `
+    <div class="msg-role">ATHERIS</div>
+    <div class="msg-body">${mdToHtml(text)}</div>
+  `;
+  document.getElementById('messages').appendChild(el);
+  scrollBottom();
+  return el;
+}
+
+function appendThinking() {
+  const el = document.createElement('div');
+  el.className = 'thinking-row';
+  el.innerHTML = `
+    <div class="thinking-role">ATHERIS</div>
+    <div class="thinking-body">
+      <span class="thinking-text">PROCESSING</span>
+      <div class="pulse-dots"><span></span><span></span><span></span></div>
+    </div>
+  `;
+  document.getElementById('messages').appendChild(el);
+  scrollBottom();
+  return el;
+}
+
+function scrollBottom() {
+  const m = document.getElementById('messages');
+  m.scrollTop = m.scrollHeight;
+}
+
+// ── Markdown ──────────────────────────────────────────────────────────────────
+function mdToHtml(md) {
+  let h = esc(md);
+  h = h.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, l, c) =>
+    `<pre><code>${c.trim()}</code></pre>`);
+  h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+  h = h.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  h = h.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  h = h.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  h = h.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  h = h.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  h = h.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+  h = h.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
+  h = h.replace(/(<li>[\s\S]+?<\/li>)/g, m => `<ul>${m}</ul>`);
+  h = h.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+  h = h.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  h = h.replace(/^---$/gm, '<hr>');
+  h = h.replace(/\n\n/g, '</p><p>');
+  h = h.replace(/\n/g, '<br>');
+  return `<p>${h}</p>`
+    .replace(/<p><\/p>/g, '')
+    .replace(/<p>(<(?:pre|ul|ol|h[123]|hr|blockquote))/g, '$1')
+    .replace(/(<\/(?:pre|ul|ol|h[123]|hr|blockquote)>)<\/p>/g, '$1');
+}
+
+function esc(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Memory modal ──────────────────────────────────────────────────────────────
+function openMemoryModal() {
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('memory-query').focus();
+}
+function closeMemoryModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+async function searchMemory() {
+  const q = document.getElementById('memory-query').value.trim();
+  if (!q) return;
+  const res = document.getElementById('memory-results');
+  res.textContent = 'SEARCHING...';
+  try {
+    const d = await fetch('/api/memory/recall', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: q, session_id: sessionId }),
+    }).then(r => r.json());
+    if (d.hits.length) {
+      res.innerHTML = d.hits.map(h =>
+        `<div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--line)">
+          &rsaquo; ${esc(h.text)}
+        </div>`).join('');
+    } else if (d.prior_context) {
+      res.style.whiteSpace = 'pre-wrap';
+      res.textContent = d.prior_context;
+    } else {
+      res.textContent = '— no results found —';
+    }
+  } catch(e) { res.textContent = 'ERROR: ' + e.message; }
+}
+
+async function storeMemory() {
+  const fact = document.getElementById('remember-input').value.trim();
+  if (!fact) return;
+  await storeFact(fact);
+  document.getElementById('remember-input').value = '';
+  document.getElementById('memory-results').textContent = 'STORED: ' + fact;
+}
+
+async function storeFact(fact) {
+  try {
+    await fetch('/api/remember', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fact, session_id: sessionId }),
+    });
+    appendOrcaMsg(`Stored in memory: *${fact}*`);
+  } catch { appendOrcaMsg('Memory store failed.'); }
+}
+
+async function loadSession(sid) {
+  newChat();
+  try {
+    const d = await fetch('/api/session/load', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sid }),
+    }).then(r => r.json());
+    sessionId = d.session_id;
+    removeWelcome();
+    appendOrcaMsg(`Session \`${sid.slice(0,8).toUpperCase()}\` resumed.`);
+  } catch {}
+}
+
+document.getElementById('modal-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closeMemoryModal();
+});
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+let _authToken = null;
+let _authUser  = null;
+
+function _authHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  if (_authToken) h['Authorization'] = 'Bearer ' + _authToken;
+  return h;
+}
+
+function switchAuthTab(tab) {
+  const forms = ['signin','signup','forgot','check-email','reset'];
+  forms.forEach(f => {
+    const el = document.getElementById('form-' + f);
+    if (el) el.style.display = f === tab ? '' : 'none';
+  });
+  document.getElementById('tab-signin').classList.toggle('active', tab === 'signin');
+  document.getElementById('tab-signup').classList.toggle('active', tab === 'signup');
+  // Clear errors
+  ['si-error','su-error','fp-error','rp-error'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '';
+  });
+}
+
+async function doLogin() {
+  const email = document.getElementById('si-email').value.trim();
+  const pass  = document.getElementById('si-password').value;
+  const errEl = document.getElementById('si-error');
+  const btn   = document.getElementById('si-btn');
+  if (!email || !pass) { errEl.textContent = 'Email and password required.'; return; }
+  btn.disabled = true; btn.textContent = 'Signing in...';
+  try {
+    const r = await fetch('/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pass }),
+    });
+    const d = await r.json();
+    if (!r.ok) { errEl.textContent = d.detail || 'Login failed.'; return; }
+    _onAuthSuccess(d);
+  } catch(e) {
+    errEl.textContent = 'Network error. Try again.';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
+}
+
+async function doSignup() {
+  const name  = document.getElementById('su-name').value.trim();
+  const email = document.getElementById('su-email').value.trim();
+  const pass  = document.getElementById('su-password').value;
+  const errEl = document.getElementById('su-error');
+  const btn   = document.getElementById('su-btn');
+  if (!email || !pass) { errEl.textContent = 'Email and password required.'; return; }
+  if (pass.length < 8) { errEl.textContent = 'Password must be at least 8 characters.'; return; }
+  btn.disabled = true; btn.textContent = 'Creating account...';
+  try {
+    const r = await fetch('/api/auth/signup', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pass, name }),
+    });
+    const d = await r.json();
+    if (!r.ok) { errEl.textContent = d.detail || 'Signup failed.'; return; }
+    _onAuthSuccess(d);
+  } catch(e) {
+    errEl.textContent = 'Network error. Try again.';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Create Account';
+  }
+}
+
+function _onAuthSuccess(data) {
+  _authToken = data.token;
+  _authUser  = data.user;
+  localStorage.setItem('atheris_token', data.token);
+  document.getElementById('auth-overlay').classList.add('hidden');
+  _updateUserUI(data.user, data.usage, data.limits);
+}
+
+function _updateUserUI(user, usage, limits) {
+  const chip = document.getElementById('user-chip');
+  chip.classList.add('visible');
+  document.getElementById('user-chip-label').textContent =
+    (user.name || user.email).toUpperCase().slice(0, 14);
+
+  // Usage bar
+  const wrap = document.getElementById('usage-bar-wrap');
+  const msgLimit = limits ? limits.messages : 50;
+  if (msgLimit !== -1) {
+    wrap.style.display = '';
+    const used = usage ? usage.messages : 0;
+    document.getElementById('usage-label').textContent = used + '/' + msgLimit;
+    document.getElementById('usage-bar').style.width =
+      Math.min(100, Math.round(used / msgLimit * 100)) + '%';
+    // Auto-show upgrade if at 90%+ of limit
+    if (used >= msgLimit * 0.9 && user.tier === 'free') {
+      setTimeout(openUpgrade, 800);
+    }
+  } else {
+    wrap.style.display = 'none';
+  }
+
+  // Profile panel
+  const nameEl = document.getElementById('profile-name');
+  const emailEl = document.getElementById('profile-email');
+  const tierEl = document.getElementById('profile-tier');
+  const upBtn = document.getElementById('upgrade-btn');
+  if (nameEl) nameEl.textContent = user.name || '—';
+  if (emailEl) emailEl.textContent = user.email;
+  if (tierEl) {
+    tierEl.textContent = user.tier.toUpperCase();
+    tierEl.className = 'plan-chip' + (user.tier !== 'free' ? ' pro' : '');
+  }
+  if (upBtn) upBtn.style.display = user.tier === 'free' ? '' : 'none';
+
+  // Admin tab visibility
+  const adminTab = document.getElementById('stab-btn-admin');
+  if (adminTab && (user.role === 'owner' || user.role === 'admin')) {
+    adminTab.style.display = '';
+  }
+
+  // Unverified banner
+  if (user.verified === false || user.verified === 0) {
+    document.getElementById('verify-banner').classList.add('visible');
+  }
+}
+
+function showUserMenu() {
+  openSettings('account');
+}
+
+function doLogout() {
+  _authToken = null; _authUser = null;
+  localStorage.removeItem('atheris_token');
+  document.getElementById('auth-overlay').classList.remove('hidden');
+  document.getElementById('user-chip').classList.remove('visible');
+  document.getElementById('usage-bar-wrap').style.display = 'none';
+}
+
+async function initAuth() {
+  const params = new URLSearchParams(location.search);
+
+  // Handle password reset link
+  const resetToken = params.get('reset_token');
+  if (resetToken) {
+    history.replaceState({}, '', '/');
+    switchAuthTab('reset');
+    document.getElementById('rp-btn').dataset.token = resetToken;
+    return;
+  }
+
+  // Handle email verification link (redirect from server to home page with ?verified=1)
+  if (params.get('verified') === '1') {
+    history.replaceState({}, '', '/');
+  }
+
+  const stored = localStorage.getItem('atheris_token');
+  if (!stored) return;
+  try {
+    const r = await fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + stored } });
+    if (!r.ok) { localStorage.removeItem('atheris_token'); return; }
+    const d = await r.json();
+    _authToken = stored;
+    _authUser  = d.user;
+    document.getElementById('auth-overlay').classList.add('hidden');
+    _updateUserUI(d.user, d.usage, d.limits);
+  } catch {}
+}
+
+// ── Settings modal ────────────────────────────────────────────────────────────
+function openSettings(tab) {
+  tab = tab || 'account';
+  document.getElementById('settings-overlay').classList.remove('hidden');
+  switchSettingsTab(tab);
+}
+
+function closeSettings() {
+  document.getElementById('settings-overlay').classList.add('hidden');
+}
+
+function switchSettingsTab(tab) {
+  ['account','apikeys','admin'].forEach(t => {
+    const panel = document.getElementById('stab-panel-' + t);
+    const btn   = document.getElementById('stab-btn-' + t);
+    if (panel) panel.style.display = t === tab ? '' : 'none';
+    if (btn)   btn.classList.toggle('active', t === tab);
+  });
+  if (tab === 'apikeys') loadApiKeys();
+  if (tab === 'admin')   loadAdminPanel();
+}
+
+document.getElementById('settings-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closeSettings();
+});
+
+// ── Change password ───────────────────────────────────────────────────────────
+async function doChangePassword() {
+  const curr = document.getElementById('cp-current').value;
+  const nw   = document.getElementById('cp-new').value;
+  const conf = document.getElementById('cp-confirm').value;
+  const msg  = document.getElementById('cp-msg');
+  if (!curr || !nw) { msg.style.color='#c05555'; msg.textContent='All fields required.'; return; }
+  if (nw.length < 8) { msg.style.color='#c05555'; msg.textContent='New password must be 8+ characters.'; return; }
+  if (nw !== conf)   { msg.style.color='#c05555'; msg.textContent='Passwords do not match.'; return; }
+  try {
+    const r = await fetch('/api/auth/change-password', {
+      method: 'POST', headers: _authHeaders(),
+      body: JSON.stringify({ current_password: curr, new_password: nw }),
+    });
+    if (!r.ok) { const d=await r.json(); msg.style.color='#c05555'; msg.textContent=d.detail||'Update failed.'; return; }
+    msg.style.color='var(--mid)'; msg.textContent='Password updated.';
+    document.getElementById('cp-current').value='';
+    document.getElementById('cp-new').value='';
+    document.getElementById('cp-confirm').value='';
+  } catch { msg.style.color='#c05555'; msg.textContent='Network error.'; }
+}
+
+// ── API Keys ──────────────────────────────────────────────────────────────────
+async function loadApiKeys() {
+  const container = document.getElementById('apikeys-list');
+  container.innerHTML = '<div class="empty-text">Loading...</div>';
+  try {
+    const r = await fetch('/api/auth/apikeys', { headers: _authHeaders() });
+    const d = await r.json();
+    if (!d.keys || !d.keys.length) {
+      container.innerHTML = '<div class="empty-text">No API keys yet. Create one above.</div>';
+      return;
+    }
+    container.innerHTML = d.keys.map(k => `
+      <div class="apikey-row${k.revoked ? ' revoked' : ''}">
+        <div class="apikey-info">
+          <div class="apikey-name">${esc(k.name || 'Unnamed key')}</div>
+          <div class="apikey-meta">Created ${_fmtDate(k.created_at)} · Last used: ${k.last_used ? _fmtDate(k.last_used) : 'Never'}</div>
+        </div>
+        ${k.revoked
+          ? '<span class="apikey-tag">REVOKED</span>'
+          : `<button class="key-revoke-btn" onclick="revokeApiKey('${k.id}')">REVOKE</button>`}
+      </div>`).join('');
+  } catch { container.innerHTML = '<div class="empty-text">Error loading keys.</div>'; }
+}
+
+async function createApiKey() {
+  const name = document.getElementById('newkey-name').value.trim() || 'API Key';
+  const btn  = document.getElementById('create-key-btn');
+  btn.disabled = true;
+  document.getElementById('new-key-box').style.display = 'none';
+  try {
+    const r = await fetch('/api/auth/apikeys', {
+      method: 'POST', headers: _authHeaders(),
+      body: JSON.stringify({ name }),
+    });
+    if (!r.ok) { alert('Failed to create key'); return; }
+    const d = await r.json();
+    document.getElementById('newkey-name').value = '';
+    document.getElementById('new-key-display').value = d.key;
+    document.getElementById('new-key-box').style.display = 'flex';
+    document.getElementById('copy-key-btn').textContent = 'COPY';
+    loadApiKeys();
+  } catch { alert('Failed to create key'); }
+  finally { btn.disabled = false; }
+}
+
+async function revokeApiKey(keyId) {
+  if (!confirm('Revoke this API key? This cannot be undone.')) return;
+  await fetch(`/api/auth/apikeys/${keyId}`, { method: 'DELETE', headers: _authHeaders() });
+  loadApiKeys();
+}
+
+function copyApiKey() {
+  const val = document.getElementById('new-key-display').value;
+  navigator.clipboard.writeText(val).catch(() => {
+    document.getElementById('new-key-display').select();
+    document.execCommand('copy');
+  });
+  const btn = document.getElementById('copy-key-btn');
+  btn.textContent = 'COPIED!';
+  setTimeout(() => { btn.textContent = 'COPY'; }, 2000);
+}
+
+// ── Admin panel ───────────────────────────────────────────────────────────────
+function loadAdminPanel() {
+  loadAdminStats();
+  loadAdminUsers();
+  loadAdminAudit();
+}
+
+async function loadAdminStats() {
+  try {
+    const d = await fetch('/api/admin/stats', { headers: _authHeaders() }).then(r => r.json());
+    const tiers = Object.entries(d.tiers || {}).map(([t,n]) => `<b>${t.toUpperCase()}:</b> ${n}`).join(' · ');
+    document.getElementById('admin-stats').innerHTML =
+      `<span class="astat">USERS: <b>${d.total_users}</b></span>
+       <span class="astat">SESSIONS: <b>${d.active_sessions}</b></span>
+       <span class="astat">UPTIME: <b>${_fmtUptime(d.uptime_sec)}</b></span>
+       <span class="astat">${tiers}</span>`;
+  } catch {}
+}
+
+async function loadAdminUsers() {
+  const tbody = document.getElementById('admin-users-tbody');
+  tbody.innerHTML = '<tr><td colspan="5" class="admin-loading">Loading...</td></tr>';
+  try {
+    const d = await fetch('/api/auth/admin/users', { headers: _authHeaders() }).then(r => r.json());
+    if (!d.users || !d.users.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="admin-loading">No users.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = d.users.map(u => `
+      <tr>
+        <td class="atd">${esc(u.email)}</td>
+        <td class="atd">${esc(u.name || '—')}</td>
+        <td class="atd">
+          <select class="admin-select" onchange="adminSetTier('${u.id}',this.value)">
+            ${['free','pro','enterprise'].map(t=>`<option${u.tier===t?' selected':''}>${t}</option>`).join('')}
+          </select>
+        </td>
+        <td class="atd">
+          <select class="admin-select" onchange="adminSetRole('${u.id}',this.value)">
+            ${['viewer','member','admin','owner'].map(r=>`<option${u.role===r?' selected':''}>${r}</option>`).join('')}
+          </select>
+        </td>
+        <td class="atd atd-muted">${u.created_at ? u.created_at.slice(0,10) : '—'}</td>
+      </tr>`).join('');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="5" class="admin-loading">Error: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+async function adminSetTier(userId, tier) {
+  await fetch(`/api/auth/admin/users/${userId}/tier`, {
+    method: 'PATCH', headers: _authHeaders(), body: JSON.stringify({ tier }),
+  });
+}
+
+async function adminSetRole(userId, role) {
+  await fetch(`/api/auth/admin/users/${userId}/role`, {
+    method: 'PATCH', headers: _authHeaders(), body: JSON.stringify({ role }),
+  });
+}
+
+async function loadAdminAudit() {
+  const container = document.getElementById('admin-audit-list');
+  container.innerHTML = '<div class="admin-loading">Loading...</div>';
+  try {
+    const d = await fetch('/api/admin/audit?limit=50', { headers: _authHeaders() }).then(r => r.json());
+    if (!d.logs || !d.logs.length) {
+      container.innerHTML = '<div class="admin-loading">No events yet.</div>';
+      return;
+    }
+    container.innerHTML = d.logs.map(l => `
+      <div class="audit-row">
+        <span class="audit-event">${esc(l.event)}</span>
+        <span class="audit-uid">${l.user_id ? l.user_id.slice(0,8) : 'anon'}</span>
+        <span class="audit-time">${_fmtDate(l.created_at)}</span>
+      </div>`).join('');
+  } catch { container.innerHTML = '<div class="admin-loading">Error loading audit log.</div>'; }
+}
+
+// ── Forgot / Reset password ───────────────────────────────────────────────────
+async function doForgotPassword() {
+  const email = document.getElementById('fp-email').value.trim();
+  const errEl = document.getElementById('fp-error');
+  const btn   = document.getElementById('fp-btn');
+  if (!email) { errEl.textContent = 'Enter your email address.'; return; }
+  btn.disabled = true; btn.textContent = 'Sending...';
+  try {
+    await fetch('/api/auth/forgot-password', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ email }),
+    });
+    document.getElementById('check-email-msg').textContent =
+      `If an account exists for ${email}, you'll receive a reset link shortly.`;
+    switchAuthTab('check-email');
+  } catch { errEl.textContent = 'Network error. Try again.'; }
+  finally { btn.disabled = false; btn.textContent = 'Send Reset Link'; }
+}
+
+async function doResetPassword() {
+  const pass  = document.getElementById('rp-password').value;
+  const conf  = document.getElementById('rp-confirm').value;
+  const errEl = document.getElementById('rp-error');
+  const btn   = document.getElementById('rp-btn');
+  if (!pass || pass.length < 8) { errEl.textContent = 'Password must be at least 8 characters.'; return; }
+  if (pass !== conf)            { errEl.textContent = 'Passwords do not match.'; return; }
+  btn.disabled = true; btn.textContent = 'Saving...';
+  try {
+    const token = btn.dataset.token || new URLSearchParams(location.search).get('reset_token') || '';
+    const r = await fetch('/api/auth/reset-password', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ token, password: pass }),
+    });
+    const d = await r.json();
+    if (!r.ok) { errEl.textContent = d.detail || 'Reset failed. Link may have expired.'; return; }
+    _onAuthSuccess(d);
+  } catch { errEl.textContent = 'Network error. Try again.'; }
+  finally { btn.disabled = false; btn.textContent = 'Set New Password'; }
+}
+
+async function resendVerification() {
+  try {
+    const r = await fetch('/api/auth/signup/resend-verification', {
+      method: 'POST', headers: _authHeaders(),
+    });
+    const d = await r.json();
+    if (d.sent) {
+      alert('Verification email sent. Check your inbox.');
+    } else {
+      alert('Email not configured on this server. Contact your admin.');
+    }
+  } catch { alert('Failed to send. Try again.'); }
+}
+
+// ── Session auto-title ────────────────────────────────────────────────────────
+async function autoTitleSession(sid, firstMessage) {
+  const words = firstMessage.trim().split(/\s+/).slice(0, 7).join(' ');
+  const title = words.length > 48 ? words.slice(0, 48) + '…' : words;
+  // Update sidebar item immediately
+  const item = document.querySelector(`.sess-item[data-sid="${sid}"] .sess-label`);
+  if (item) item.textContent = title;
+  try {
+    await fetch(`/api/session/${sid}/title`, {
+      method: 'PATCH', headers: _authHeaders(),
+      body: JSON.stringify({ title }),
+    });
+  } catch {}
+}
+
+// ── Export conversation ───────────────────────────────────────────────────────
+function exportConversation() {
+  const rows = document.querySelectorAll('.msg-row');
+  if (!rows.length) { alert('No conversation to export.'); return; }
+  let md = '# Atheris Conversation\n\n';
+  md += `_${new Date().toLocaleString()}_\n\n---\n\n`;
+  rows.forEach(row => {
+    const isUser = row.classList.contains('user-row');
+    const body   = row.querySelector('.msg-body');
+    if (body) md += `**${isUser ? 'You' : 'Atheris'}**\n\n${body.innerText || body.textContent}\n\n---\n\n`;
+  });
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = `atheris-${sessionId ? sessionId.slice(0,8) : 'conversation'}.md`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── Upgrade modal ─────────────────────────────────────────────────────────────
+function openUpgrade() {
+  document.getElementById('upgrade-overlay').classList.remove('hidden');
+}
+
+function closeUpgrade() {
+  document.getElementById('upgrade-overlay').classList.add('hidden');
+}
+
+document.getElementById('upgrade-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closeUpgrade();
+});
+
+async function goToCheckout() {
+  // If Stripe is configured on the server, redirect to checkout
+  // Otherwise show contact info
+  try {
+    const r = await fetch('/api/billing/checkout', { method: 'POST', headers: _authHeaders() });
+    if (r.ok) {
+      const d = await r.json();
+      if (d.url) { window.location.href = d.url; return; }
+    }
+  } catch {}
+  window.location.href = 'mailto:hello@atheris.ai?subject=Atheris+Pro+Upgrade';
+}
+
+// ── Model availability ────────────────────────────────────────────────────────
+async function checkModelAvailability() {
+  try {
+    const d = await fetch('/api/models').then(r => r.json());
+    ['nano','core','ultra'].forEach(v => {
+      const pid  = v === 'ultra' ? 'mpill-ultra-m' : 'mpill-' + v;
+      const pill = document.getElementById(pid);
+      if (!pill) return;
+      const info = d[v] || {};
+      if (!info.available) {
+        pill.classList.add('mpill-unavail');
+        pill.title = `${info.model || v} — not pulled. Run: ollama pull ${info.model || v}`;
+      } else {
+        pill.classList.remove('mpill-unavail');
+        pill.title = info.model || v;
+      }
+    });
+  } catch {}
+}
+
+// ── Utility helpers ───────────────────────────────────────────────────────────
+function _fmtDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(typeof ts === 'string' ? ts : ts * 1000);
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
+function _fmtUptime(sec) {
+  if (sec < 60)   return sec + 's';
+  if (sec < 3600) return Math.floor(sec/60) + 'm';
+  return Math.floor(sec/3600) + 'h ' + Math.floor((sec%3600)/60) + 'm';
+}
+
+// Keyboard shortcuts for auth forms
+document.getElementById('si-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+document.getElementById('su-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSignup();
+});
+
+// Init auth on load
+initAuth();
+</script>
+</body>
+</html>
