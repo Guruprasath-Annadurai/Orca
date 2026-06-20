@@ -3,25 +3,26 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "orca-ai"
-version = "0.1.1"
-description = "Orca — 100% local private AI. Your hardware. Your data."
+name = "atheris-ai"
+version = "1.0.0"
+description = "Atheris — 100% private local AI. Document Q&A, code interpreter, voice input. Your hardware, your data, zero cloud."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "Proprietary" }
-authors = [{ name = "Orca Systems" }]
-keywords = ["ai", "llm", "local", "private", "ollama", "agent"]
+license = { text = "MIT" }
+authors = [{ name = "Atheris Systems", email = "hello@atheris.ai" }]
+keywords = ["ai", "llm", "local", "private", "ollama", "agent", "rag", "document-qa"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Intended Audience :: End Users/Desktop",
-    "License :: Other/Proprietary License",
+    "License :: OSI Approved :: MIT License",
     "Operating System :: MacOS",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Utilities",
 ]
@@ -39,16 +40,25 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage     = "https://orca.systems"
-Docs         = "https://orca.systems/docs"
-Changelog    = "https://orca.systems/changelog"
-"Bug Tracker" = "https://github.com/orca-systems/orca/issues"
+Homepage      = "https://atheris.ai"
+Docs          = "https://atheris.ai/docs"
+Repository    = "https://github.com/Guruprasath-Annadurai/Orca"
+Changelog     = "https://atheris.ai/changelog"
+"Bug Tracker" = "https://github.com/Guruprasath-Annadurai/Orca/issues"
 
 [project.optional-dependencies]
 memory = ["chromadb>=0.5.0"]
+docs   = ["chromadb>=0.5.0", "pypdf>=4.0.0", "python-docx>=1.1.0", "pdfminer.six>=20221105"]
+code   = []   # sandboxed exec uses stdlib only
+voice  = []   # Web Speech API — browser-native, no Python deps
 mcp    = ["mcp>=1.0.0"]
 stripe = ["stripe>=7.0.0"]
 dev    = ["pytest>=8.0.0", "pytest-asyncio>=0.23.0", "mypy>=1.10.0"]
+all    = [
+    "chromadb>=0.5.0",
+    "pypdf>=4.0.0", "python-docx>=1.1.0", "pdfminer.six>=20221105",
+    "mcp>=1.0.0",
+]
 train  = [
     "unsloth>=2024.11.0",
     "trl>=0.12.0",
@@ -62,7 +72,8 @@ train  = [
 ]
 
 [project.scripts]
-orca = "orca.cli:app"
+orca    = "orca.cli:app"
+atheris = "orca.cli:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["orca"]

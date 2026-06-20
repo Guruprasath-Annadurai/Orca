@@ -22,7 +22,7 @@ import uuid
 from pathlib import Path
 from typing import AsyncIterator
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, File, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -44,6 +44,11 @@ from orca.tools import build_registry
 from orca.character import CORE_SYSTEM_WITH_TOOLS
 from orca.config import CONFIG, ORCA_HOME
 from orca.variants.ultra import OrcaUltra
+from orca.docs import (
+    extract, SUPPORTED_EXTENSIONS, MAX_FILE_SIZE,
+    chunk_text, DocStore, register_doc, unregister_doc, list_docs,
+)
+from orca.code import run_code
 
 _START_TIME = time.time()
 WEB_DIR = Path(__file__).parent / "web"
@@ -88,6 +93,7 @@ class _Session:
                 {"role": "assistant", "content": "Context loaded."},
             ])
         self.brain = brain
+        self.doc_store = DocStore(session_id=session_id, ollama_host=CONFIG.ollama.host)
         self.last_active = time.time()
 
     def touch(self):
@@ -266,9 +272,20 @@ async def stream_chat(
     mem_ctx = sess.memory.recall_context(req.message, n=3)
     enriched = f"[Relevant memory]\n{mem_ctx}\n\n{req.message}" if mem_ctx else req.message
 
+    # RAG: inject relevant document chunks if any docs are loaded
+    doc_chunks = sess.doc_store.retrieve(req.message, top_k=4) if sess.doc_store.count() > 0 else []
+    if doc_chunks:
+        rag_context = "\n\n".join(
+            f"[{c['filename']} §{c['chunk_idx']+1}]\n{c['text']}" for c in doc_chunks
+        )
+        enriched = f"[Document context — use this to answer]\n{rag_context}\n\n{enriched}"
+
     async def _event_stream() -> AsyncIterator[str]:
         # Send session_id first
         yield f"data: {json.dumps({'type': 'session', 'session_id': sess.id})}\n\n"
+        if doc_chunks:
+            sources = list({c['filename'] for c in doc_chunks})
+            yield f"data: {json.dumps({'type': 'rag', 'sources': sources})}\n\n"
 
         full = ""
         tool_names: list[str] = []
@@ -532,6 +549,115 @@ async def ultra_run(req: UltraRequest):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Document Q&A (RAG) endpoints
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.post("/api/docs/upload")
+async def upload_doc(
+    file: UploadFile = File(...),
+    session_id: str | None = None,
+    user: User | None = Depends(get_current_user_optional),
+):
+    """Upload a document for RAG — extract, chunk, embed, and store."""
+    if file.filename and Path(file.filename).suffix.lower() not in SUPPORTED_EXTENSIONS:
+        return JSONResponse(
+            {"error": f"Unsupported file type. Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"},
+            status_code=400,
+        )
+
+    data = await file.read()
+    if len(data) > MAX_FILE_SIZE:
+        return JSONResponse(
+            {"error": f"File too large ({len(data)//1024//1024}MB). Max: {MAX_FILE_SIZE//1024//1024}MB"},
+            status_code=413,
+        )
+
+    filename = file.filename or "upload.txt"
+    try:
+        text = extract(filename, data)
+    except Exception as e:
+        return JSONResponse({"error": f"Extraction failed: {e}"}, status_code=422)
+
+    if not text.strip():
+        return JSONResponse({"error": "No text could be extracted from this file."}, status_code=422)
+
+    doc_id = str(uuid.uuid4())
+    chunks = chunk_text(text, doc_id=doc_id, filename=filename)
+
+    sess = _get_session(session_id)
+    stored = sess.doc_store.add_chunks(chunks, doc_id=doc_id, filename=filename)
+    register_doc(sess.id, doc_id, filename, chunk_count=stored, size_bytes=len(data))
+
+    audit.log("doc_upload", user_id=user.id if user else None,
+              detail={"filename": filename, "chunks": stored, "bytes": len(data)})
+
+    return {
+        "doc_id": doc_id,
+        "filename": filename,
+        "chunks": stored,
+        "size_bytes": len(data),
+        "session_id": sess.id,
+    }
+
+
+@app.get("/api/docs/list")
+async def list_session_docs(session_id: str | None = None):
+    """List all documents uploaded in the current session."""
+    sess = _get_session(session_id)
+    docs = list_docs(sess.id)
+    return {"docs": docs, "session_id": sess.id, "total_chunks": sess.doc_store.count()}
+
+
+@app.delete("/api/docs/{doc_id}")
+async def delete_doc(
+    doc_id: str,
+    session_id: str | None = None,
+    user: User | None = Depends(get_current_user_optional),
+):
+    """Remove a document and all its chunks from the session store."""
+    sess = _get_session(session_id)
+    ok = sess.doc_store.delete_doc(doc_id)
+    unregister_doc(sess.id, doc_id)
+    audit.log("doc_delete", user_id=user.id if user else None, detail={"doc_id": doc_id})
+    return {"deleted": ok, "doc_id": doc_id, "session_id": sess.id}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Code Interpreter endpoint
+# ─────────────────────────────────────────────────────────────────────────────
+
+class CodeRunRequest(BaseModel):
+    code: str
+    language: str = "python"
+    session_id: str | None = None
+
+
+@app.post("/api/code/run")
+async def code_run(
+    req: CodeRunRequest,
+    user: User | None = Depends(get_current_user_optional),
+):
+    """Execute Python code in a sandboxed subprocess. Returns stdout/stderr/error."""
+    if req.language != "python":
+        return JSONResponse({"error": f"Language '{req.language}' not supported. Only Python is available."}, status_code=400)
+
+    result = await asyncio.to_thread(run_code, req.code)
+
+    audit.log("code_run", user_id=user.id if user else None,
+              detail={"exit_code": result.exit_code, "duration_ms": result.duration_ms,
+                      "ok": result.ok})
+
+    return {
+        "stdout":      result.stdout,
+        "stderr":      result.stderr,
+        "error":       result.error,
+        "exit_code":   result.exit_code,
+        "duration_ms": result.duration_ms,
+        "ok":          result.ok,
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────

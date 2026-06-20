@@ -502,6 +502,58 @@ body {
 
 .msg-body pre code { background: none; border: none; padding: 0; }
 
+/* ── Code Interpreter ── */
+.code-block-wrap {
+  border: 1px solid var(--line2);
+  margin: 8px 0;
+  overflow: hidden;
+}
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  background: var(--surface3);
+  border-bottom: 1px solid var(--line2);
+}
+.code-lang {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.code-run-btn {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--mid);
+  background: transparent;
+  border: 1px solid var(--line2);
+  padding: 2px 10px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.15s;
+}
+.code-run-btn:hover { color: var(--white); border-color: var(--white); }
+.code-run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.code-output {
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  padding: 8px 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.code-output.hidden { display: none; }
+.code-output .cout-ok   { color: var(--text); }
+.code-output .cout-err  { color: #e07070; }
+.code-output .cout-meta { color: var(--muted); font-size: 10px; margin-top: 4px; }
+
 .msg-body h1, .msg-body h2, .msg-body h3 {
   font-weight: 600;
   color: var(--white);
@@ -713,6 +765,116 @@ body {
   font-size: 9px;
   color: var(--muted);
   letter-spacing: 0.06em;
+}
+
+/* ── Document Q&A ────────────────────────────────────────────────────────────── */
+#doc-chips-bar {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 24px 0 80px;
+  max-width: 900px;
+  margin: 0 auto;
+  flex-wrap: wrap;
+}
+#doc-chips-bar.has-docs { display: flex; }
+
+.doc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--mid);
+  background: var(--surface2);
+  border: 1px solid var(--line2);
+  padding: 3px 8px;
+  cursor: default;
+  text-transform: uppercase;
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.doc-chip-del {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1;
+  margin-left: 2px;
+  flex-shrink: 0;
+}
+.doc-chip-del:hover { color: var(--white); }
+
+.attach-btn {
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  border: 1px solid var(--line2);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-bottom: 12px;
+  margin-left: 4px;
+  transition: all 0.15s;
+}
+.attach-btn:hover { border-color: var(--white); color: var(--white); }
+
+.rag-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: #5a9a6a;
+  border: 1px solid #2a4a2e;
+  background: #0d1f0f;
+  padding: 2px 8px;
+  margin: 2px 0;
+  text-transform: uppercase;
+}
+.rag-dot {
+  width: 5px; height: 5px;
+  background: #5a9a6a;
+  border-radius: 50%;
+  animation: rag-pulse 1.5s infinite;
+}
+@keyframes rag-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ── Voice Input ─────────────────────────────────────────────────────────────── */
+.mic-btn {
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  border: 1px solid var(--line2);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-bottom: 12px;
+  margin-left: 4px;
+  transition: all 0.15s;
+  position: relative;
+}
+.mic-btn:hover { border-color: var(--white); color: var(--white); }
+.mic-btn.listening {
+  border-color: #c0392b;
+  color: #e74c3c;
+  animation: mic-pulse 1s infinite;
+}
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(231,76,60,0.4); }
+  50%       { box-shadow: 0 0 0 4px rgba(231,76,60,0); }
 }
 
 /* ── Memory Modal ────────────────────────────────────────────────────────────── */
@@ -1607,10 +1769,26 @@ body {
     </div>
 
     <div id="input-area">
+      <div id="doc-chips-bar"></div>
       <div class="input-inner">
         <div class="input-role">YOU</div>
         <textarea id="msg-input" placeholder="Send a message to Atheris..." rows="1"
           oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
+        <input type="file" id="doc-file-input" style="display:none" multiple
+          accept=".pdf,.txt,.md,.rst,.log,.yaml,.yml,.toml,.ini,.docx,.csv,.json,.py,.js,.ts,.java,.cpp,.c,.go,.rb,.rs,.sh"
+          onchange="uploadDocs(this.files)">
+        <button class="attach-btn" onclick="document.getElementById('doc-file-input').click()" title="Attach document for Q&A">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+            <path d="M13.5 8L7 14.5C5.6 15.9 3.4 15.9 2 14.5C0.6 13.1 0.6 10.9 2 9.5L9 2.5C9.9 1.6 11.4 1.6 12.3 2.5C13.2 3.4 13.2 4.9 12.3 5.8L5.8 12.3C5.4 12.7 4.7 12.7 4.3 12.3C3.9 11.9 3.9 11.2 4.3 10.8L10.5 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="mic-btn" id="mic-btn" onclick="toggleVoiceInput()" title="Voice input">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <rect x="5" y="1" width="6" height="9" rx="3" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M2 8C2 11.3 4.7 14 8 14C11.3 14 14 11.3 14 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            <line x1="8" y1="14" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </button>
         <button class="send-btn" id="send-btn" onclick="sendMessage()" title="Send (Enter)">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
             <line x1="8" y1="14" x2="8" y2="2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -1819,6 +1997,8 @@ let rawBuffer = '';
 let currentMode = 'core';
 let currentModelVariant = 'core';
 let _firstMessageInSession = null;
+let _ragSources = null;
+let _uploadedDocs = [];  // { doc_id, filename }
 
 function setModelVariant(v) {
   currentModelVariant = v;
@@ -2061,6 +2241,7 @@ async function sendMessage() {
     const dec = new TextDecoder();
     let orcaEl = null;
     rawBuffer = '';
+    _ragSources = null;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -2072,6 +2253,10 @@ async function sendMessage() {
           const ev = JSON.parse(line.slice(6));
           if (ev.type === 'session') {
             sessionId = ev.session_id;
+          } else if (ev.type === 'rag') {
+            _ragSources = ev.sources;
+            thinkEl.querySelector('.thinking-text').textContent =
+              'READING: ' + ev.sources.join(', ').toUpperCase();
           } else if (ev.type === 'thinking') {
             thinkEl.querySelector('.thinking-text').textContent = ev.text.toUpperCase();
           } else if (ev.type === 'chunk') {
@@ -2095,6 +2280,13 @@ async function sendMessage() {
                 </span>`
               ).join('');
               if (orcaEl) orcaEl.insertAdjacentElement('beforebegin', bar);
+            }
+            if (_ragSources && _ragSources.length && orcaEl) {
+              const ragBar = document.createElement('div');
+              ragBar.className = 'rag-indicator';
+              ragBar.innerHTML = `<span class="rag-dot"></span>RAG &nbsp;·&nbsp; ${_ragSources.map(s => s.toUpperCase()).join(' · ')}`;
+              orcaEl.insertAdjacentElement('afterend', ragBar);
+              _ragSources = null;
             }
             if (sessionId && _firstMessageInSession) {
               autoTitleSession(sessionId, _firstMessageInSession);
@@ -2242,10 +2434,26 @@ function scrollBottom() {
 }
 
 // ── Markdown ──────────────────────────────────────────────────────────────────
+let _codeBlockIdx = 0;
+
 function mdToHtml(md) {
   let h = esc(md);
-  h = h.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, l, c) =>
-    `<pre><code>${c.trim()}</code></pre>`);
+  h = h.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, c) => {
+    const code = c.trim();
+    const isPython = (lang === 'python' || lang === 'py' || lang === '');
+    const idx = _codeBlockIdx++;
+    const runBtn = isPython
+      ? `<button class="code-run-btn" onclick="runCodeBlock(${idx})" title="Run Python">&#x25B6; Run</button>`
+      : '';
+    return `<div class="code-block-wrap" id="cbw-${idx}">` +
+           `<div class="code-block-header">` +
+           `<span class="code-lang">${lang || 'code'}</span>` +
+           `${runBtn}` +
+           `</div>` +
+           `<pre><code data-cbidx="${idx}">${code}</code></pre>` +
+           `<div class="code-output hidden" id="cout-${idx}"></div>` +
+           `</div>`;
+  });
   h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
   h = h.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
   h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
@@ -2845,6 +3053,208 @@ function _fmtUptime(sec) {
   if (sec < 60)   return sec + 's';
   if (sec < 3600) return Math.floor(sec/60) + 'm';
   return Math.floor(sec/3600) + 'h ' + Math.floor((sec%3600)/60) + 'm';
+}
+
+// ── Voice Input ──────────────────────────────────────────────────────────────
+
+let _recognition = null;
+let _isListening = false;
+
+function toggleVoiceInput() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    appendOrcaMsg('Voice input requires Chrome or Edge — Web Speech API not available in this browser.');
+    return;
+  }
+
+  if (_isListening) {
+    _stopVoice();
+    return;
+  }
+
+  _recognition = new SpeechRecognition();
+  _recognition.continuous = false;
+  _recognition.interimResults = true;
+  _recognition.lang = 'en-US';
+
+  const input = document.getElementById('msg-input');
+  const btn   = document.getElementById('mic-btn');
+  const _base = input.value;
+
+  _recognition.onstart = () => {
+    _isListening = true;
+    btn.classList.add('listening');
+    btn.title = 'Listening... (click to stop)';
+  };
+
+  _recognition.onresult = (e) => {
+    let interim = '';
+    let final   = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) final += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    input.value = _base + final + interim;
+    autoResize(input);
+  };
+
+  _recognition.onend = () => { _stopVoice(); };
+
+  _recognition.onerror = (e) => {
+    _stopVoice();
+    if (e.error !== 'no-speech' && e.error !== 'aborted') {
+      appendOrcaMsg(`Voice input error: ${e.error}`);
+    }
+  };
+
+  _recognition.start();
+}
+
+function _stopVoice() {
+  _isListening = false;
+  const btn = document.getElementById('mic-btn');
+  if (btn) { btn.classList.remove('listening'); btn.title = 'Voice input'; }
+  if (_recognition) { try { _recognition.stop(); } catch {} _recognition = null; }
+}
+
+// ── Code Interpreter ─────────────────────────────────────────────────────────
+
+async function runCodeBlock(idx) {
+  const codeEl = document.querySelector(`code[data-cbidx="${idx}"]`);
+  const outEl   = document.getElementById(`cout-${idx}`);
+  const btnEl   = document.querySelector(`#cbw-${idx} .code-run-btn`);
+  if (!codeEl || !outEl) return;
+
+  // Decode HTML entities to get raw code
+  const raw = codeEl.textContent;
+
+  outEl.classList.remove('hidden');
+  outEl.innerHTML = '<span class="cout-meta">Running...</span>';
+  if (btnEl) btnEl.disabled = true;
+
+  try {
+    const resp = await fetch('/api/code/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ..._authHeaders() },
+      body: JSON.stringify({ code: raw, session_id: sessionId }),
+    });
+    const data = await resp.json();
+
+    let html = '';
+    if (data.error) {
+      html += `<span class="cout-err">${esc(data.error)}</span>\n`;
+    }
+    if (data.stdout) {
+      html += `<span class="cout-ok">${esc(data.stdout)}</span>`;
+    }
+    if (data.stderr) {
+      html += `<span class="cout-err">${esc(data.stderr)}</span>`;
+    }
+    if (!data.stdout && !data.stderr && !data.error) {
+      html = '<span class="cout-meta">(no output)</span>';
+    }
+    const exitBadge = data.exit_code === 0
+      ? `<span style="color:#5a9a6a">exit 0</span>`
+      : `<span style="color:#e07070">exit ${data.exit_code}</span>`;
+    html += `\n<span class="cout-meta">${exitBadge} · ${data.duration_ms}ms</span>`;
+    outEl.innerHTML = html;
+  } catch(e) {
+    outEl.innerHTML = `<span class="cout-err">Request failed: ${esc(e.message)}</span>`;
+  }
+
+  if (btnEl) btnEl.disabled = false;
+}
+
+// ── Document Q&A ─────────────────────────────────────────────────────────────
+
+function _renderDocChips() {
+  const bar = document.getElementById('doc-chips-bar');
+  if (!bar) return;
+  bar.innerHTML = '';
+  if (_uploadedDocs.length === 0) {
+    bar.classList.remove('has-docs');
+    return;
+  }
+  bar.classList.add('has-docs');
+  _uploadedDocs.forEach(doc => {
+    const chip = document.createElement('span');
+    chip.className = 'doc-chip';
+    chip.title = doc.filename;
+    chip.innerHTML =
+      `<svg width="8" height="8" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="1" width="10" height="14" rx="1"/><line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/><line x1="6" y1="11" x2="8" y2="11"/></svg>` +
+      `${doc.filename}` +
+      `<span class="doc-chip-del" onclick="removeDoc('${doc.doc_id}')" title="Remove">×</span>`;
+    bar.appendChild(chip);
+  });
+}
+
+async function uploadDocs(files) {
+  if (!files || files.length === 0) return;
+  const fileInput = document.getElementById('doc-file-input');
+
+  for (const file of Array.from(files)) {
+    const fd = new FormData();
+    fd.append('file', file);
+    if (sessionId) fd.append('session_id', sessionId);
+
+    const thinkEl = appendThinking();
+    thinkEl.querySelector('.thinking-text').textContent = `UPLOADING ${file.name.toUpperCase()}...`;
+
+    try {
+      const resp = await fetch('/api/docs/upload', {
+        method: 'POST',
+        headers: _authHeaders(),
+        body: fd,
+      });
+      const data = await resp.json();
+      thinkEl.remove();
+
+      if (!resp.ok || data.error) {
+        appendOrcaMsg(`Upload failed: ${data.error || 'Unknown error'}`);
+        continue;
+      }
+
+      // Update session ID if we didn't have one
+      if (!sessionId && data.session_id) sessionId = data.session_id;
+
+      _uploadedDocs.push({ doc_id: data.doc_id, filename: data.filename });
+      _renderDocChips();
+
+      appendOrcaMsg(
+        `**${data.filename}** uploaded — ${data.chunks} chunks indexed. ` +
+        `You can now ask questions about this document.`
+      );
+    } catch(e) {
+      thinkEl.remove();
+      appendOrcaMsg(`Upload error: ${e.message}`);
+    }
+  }
+
+  // Reset file input so same file can be re-uploaded
+  fileInput.value = '';
+}
+
+async function removeDoc(docId) {
+  const params = sessionId ? `?session_id=${sessionId}` : '';
+  try {
+    await fetch(`/api/docs/${docId}${params}`, {
+      method: 'DELETE',
+      headers: _authHeaders(),
+    });
+  } catch {}
+  _uploadedDocs = _uploadedDocs.filter(d => d.doc_id !== docId);
+  _renderDocChips();
+}
+
+// Load existing docs when session is restored
+async function loadSessionDocs(sid) {
+  if (!sid) return;
+  try {
+    const resp = await fetch(`/api/docs/list?session_id=${sid}`, { headers: _authHeaders() });
+    const data = await resp.json();
+    _uploadedDocs = (data.docs || []).map(d => ({ doc_id: d.doc_id, filename: d.filename }));
+    _renderDocChips();
+  } catch {}
 }
 
 // Keyboard shortcuts for auth forms
