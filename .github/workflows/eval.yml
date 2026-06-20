@@ -1,0 +1,137 @@
+name: Model Eval
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "orca/train/**"
+      - "orca/data/**"
+      - "orca/brain/**"
+      - ".github/workflows/eval.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "orca/train/**"
+      - "orca/data/**"
+      - "orca/brain/**"
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "Ollama model to evaluate (default: orca-core)"
+        required: false
+        default: "orca-core"
+      threshold:
+        description: "Minimum passing score (0-100)"
+        required: false
+        default: "40"
+
+jobs:
+  eval:
+    name: Atheris Model Eval
+    runs-on: self-hosted   # requires a runner with Ollama installed
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Orca (no GPU deps)
+        run: |
+          pip install uv
+          uv pip install --system -e ".[dev]" 2>/dev/null || uv pip install --system -e .
+
+      - name: Check Ollama status
+        run: |
+          ollama --version
+          ollama list
+
+      - name: Determine model to evaluate
+        id: model
+        run: |
+          MODEL="${{ github.event.inputs.model || 'orca-core' }}"
+          echo "model=$MODEL" >> "$GITHUB_OUTPUT"
+
+      - name: Pull model if needed
+        run: ollama pull ${{ steps.model.outputs.model }} || true
+
+      - name: Run evaluation (accuracy + style, CI mode)
+        run: |
+          orca train eval \
+            --ollama "${{ steps.model.outputs.model }}" \
+            --n-accuracy 50 \
+            --n-style 10 \
+            --ci \
+            --threshold "${{ github.event.inputs.threshold || '40' }}"
+
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report-${{ steps.model.outputs.model }}-${{ github.run_number }}
+          path: ~/.orca/training/eval/eval_${{ steps.model.outputs.model }}.json
+          retention-days: 90
+
+      - name: Post eval summary to PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const os = require('os');
+            const model = '${{ steps.model.outputs.model }}';
+            const reportPath = `${os.homedir()}/.orca/training/eval/eval_${model}.json`;
+            let body = `## Atheris Eval — \`${model}\`\n\n`;
+            try {
+              const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+              const score = report.overall_score;
+              const acc   = (report.accuracy.accuracy * 100).toFixed(1);
+              const style = report.style.style_score;
+              const tps   = (report.speed.tokens_per_sec || 0).toFixed(1);
+              const emoji = score >= 60 ? '🟢' : score >= 40 ? '🟡' : '🔴';
+              body += `${emoji} **Overall: ${score}/100**\n\n`;
+              body += `| Metric | Value |\n|--------|-------|\n`;
+              body += `| Accuracy | ${acc}% (${report.accuracy.n_prompts} prompts) |\n`;
+              body += `| Style | ${style}/10 |\n`;
+              body += `| Speed | ${tps} tok/s |\n`;
+              body += `| Timestamp | ${report.timestamp} |\n`;
+            } catch (e) {
+              body += `⚠️ Report not found: ${e.message}`;
+            }
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
+
+  # Separate job: data quality gate — runs on every push
+  data-check:
+    name: Training Data Check
+    runs-on: self-hosted
+    timeout-minutes: 5
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Orca
+        run: |
+          pip install uv
+          uv pip install --system -e . 2>/dev/null || true
+
+      - name: Check training data readiness
+        run: |
+          orca train prepare
+        continue-on-error: true  # don't fail CI if data is below 1000 — just report

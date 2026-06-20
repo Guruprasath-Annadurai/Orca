@@ -1,0 +1,65 @@
+name: Seed Training Data
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Target total examples (e.g. 1000)"
+        required: false
+        default: "1000"
+      model:
+        description: "Ollama model to use for generation"
+        required: false
+        default: ""
+
+# Seed data on self-hosted runner with Ollama — runs on-demand
+jobs:
+  seed:
+    name: Generate Training Data
+    runs-on: self-hosted
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Orca
+        run: |
+          pip install uv
+          uv pip install --system -e .
+
+      - name: Check Ollama
+        run: ollama list
+
+      - name: Show current data stats
+        run: orca data stats
+
+      - name: Seed to target
+        run: |
+          TARGET="${{ github.event.inputs.target || '1000' }}"
+          MODEL_ARG=""
+          if [ -n "${{ github.event.inputs.model }}" ]; then
+            MODEL_ARG="--model ${{ github.event.inputs.model }}"
+          fi
+          orca data seed --to "$TARGET" --fast $MODEL_ARG
+
+      - name: Curate data
+        run: orca data curate
+
+      - name: Format for training
+        run: orca data format --format llama3 --split
+
+      - name: Show final stats
+        run: orca train prepare
+
+      - name: Upload formatted data as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-data-${{ github.run_number }}
+          path: ~/.orca/training/formatted/
+          retention-days: 30

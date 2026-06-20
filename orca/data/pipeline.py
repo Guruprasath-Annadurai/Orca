@@ -28,6 +28,26 @@ from orca.data.seeds import Domain, build_prompt, sample_domains, ALL_DOMAINS
 
 console = Console()
 
+_PROGRESS_FILE = ORCA_HOME / "training" / "seed_progress.json"
+
+
+def count_raw_examples() -> int:
+    """Count total examples in all raw JSONL files."""
+    total = 0
+    if RAW_DATA_DIR.exists():
+        for f in RAW_DATA_DIR.glob("*.jsonl"):
+            try:
+                total += sum(1 for _ in open(f) if _.strip())
+            except Exception:
+                pass
+    return total
+
+
+def examples_needed_to_reach(target: int) -> int:
+    """Return how many more examples are needed to reach target."""
+    current = count_raw_examples()
+    return max(0, target - current)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Worker state

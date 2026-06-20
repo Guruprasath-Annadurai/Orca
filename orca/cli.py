@@ -367,8 +367,9 @@ def data_stats():
 
 @data_app.command("seed")
 def data_seed(
-    n: int = typer.Option(500, "--n", help="Total examples to generate"),
-    workers: int = typer.Option(2, "--workers", "-w", help="Workers (note: Ollama serializes, >2 rarely helps)"),
+    n: int = typer.Option(None, "--n", help="Examples to generate this run"),
+    to: int = typer.Option(None, "--to", help="Generate until total reaches this many (e.g. --to 1000)"),
+    workers: int = typer.Option(2, "--workers", "-w", help="Workers (Ollama serializes, >2 rarely helps)"),
     domains: str = typer.Option(None, "--domains", "-d", help="Comma-separated domains (default: all)"),
     model: str = typer.Option(None, "--model", "-m"),
     temperature: float = typer.Option(0.85, "--temp", "-t"),
@@ -376,14 +377,20 @@ def data_seed(
     fast: bool = typer.Option(False, "--fast", help="Fast mode: 400 token cap, shorter answers"),
     preview: bool = typer.Option(False, "--preview", help="Preview one example per domain then exit"),
 ):
-    """Generate synthetic training data in parallel using your local model."""
+    """Generate synthetic training data in parallel using your local model.
+
+    Examples:
+      orca data seed --n 100          # generate exactly 100 examples
+      orca data seed --to 1000        # generate until total reaches 1000
+      orca data seed --to 1000 --fast # same, faster (shorter answers)
+    """
     from orca.brain.providers import get_brain
-    from orca.data.pipeline import SeedPipeline, preview_domain
+    from orca.data.pipeline import SeedPipeline, preview_domain, count_raw_examples, examples_needed_to_reach
     from orca.data.seeds import ALL_DOMAINS, DOMAIN_MAP
 
     try:
         brain = get_brain(model)
-    except RuntimeError as e:
+    except RuntimeError:
         from orca.tui import ollama_offline_panel
         ollama_offline_panel()
         raise typer.Exit(1)
@@ -391,15 +398,12 @@ def data_seed(
     domain_list = [d.strip() for d in domains.split(",")] if domains else None
 
     if preview:
-        # Preview mode: generate one example per requested domain
         targets = domain_list or [d.name for d in ALL_DOMAINS[:5]]
         for dname in targets:
             console.print(f"\n[cyan]── {dname} ──[/cyan]")
-            result = preview_domain(dname, brain)
-            console.print(result[:500])
+            console.print(preview_domain(dname, brain)[:500])
         return
 
-    # Validate domain names
     if domain_list:
         for dname in domain_list:
             if dname not in DOMAIN_MAP:
@@ -407,9 +411,24 @@ def data_seed(
                 console.print(f"Available: {', '.join(DOMAIN_MAP.keys())}")
                 raise typer.Exit(1)
 
-    console.print(f"\n[bold cyan]◈ Orca Parallel Seed Pipeline[/bold cyan]")
+    # Resolve n
+    if to is not None:
+        current = count_raw_examples()
+        needed = examples_needed_to_reach(to)
+        console.print(f"\n  [dim]current:[/dim]  [bold]{current}[/bold] examples")
+        console.print(f"  [dim]target:[/dim]   [bold]{to}[/bold] total")
+        if needed == 0:
+            console.print(f"\n  [green bold]✓[/green bold] Already at {current} examples — target reached!")
+            console.print(f"  Next: [bold]orca data curate[/bold]")
+            return
+        console.print(f"  [dim]need:[/dim]     [bold cyan]{needed}[/bold cyan] more to reach {to}\n")
+        n = needed
+    elif n is None:
+        n = 500
+
+    console.print(f"[bold cyan]◈ Atheris Seed Pipeline[/bold cyan]")
     console.print(f"  [dim]model:[/dim]   [bold]{brain.name}[/bold]")
-    console.print(f"  [dim]target:[/dim]  [bold]{n}[/bold] examples")
+    console.print(f"  [dim]target:[/dim]  [bold]{n}[/bold] examples this run")
     console.print(f"  [dim]workers:[/dim] [bold]{workers}[/bold] parallel")
     domains_label = ", ".join(domain_list) if domain_list else f"all {len(ALL_DOMAINS)} domains"
     console.print(f"  [dim]domains:[/dim] [bold]{domains_label}[/bold]")
@@ -420,26 +439,36 @@ def data_seed(
         console.print(f"  [dim]fast mode:[/dim] [bold]{effective_tokens} token cap[/bold]\n")
 
     pipeline = SeedPipeline(
-        brain=brain,
-        n=n,
-        workers=workers,
-        domains=domain_list,
-        temperature=temperature,
-        max_tokens=effective_tokens,
+        brain=brain, n=n, workers=workers, domains=domain_list,
+        temperature=temperature, max_tokens=effective_tokens,
     )
-
     result = pipeline.run()
 
+    new_total = count_raw_examples()
     console.print(f"\n[bold green]✓ Done![/bold green]")
     console.print(f"  Generated: [bold green]{result.total_generated}[/bold green]")
     console.print(f"  Skipped:   [dim]{result.total_skipped}[/dim]")
-    console.print(f"  Time:      {result.duration_sec:.0f}s")
-    console.print(f"  Rate:      {result.total_generated / max(result.duration_sec, 1) * 60:.0f} examples/min\n")
+    console.print(f"  Total now: [bold]{new_total}[/bold] raw examples")
+    console.print(f"  Time:      {result.duration_sec:.0f}s "
+                  f"({result.total_generated / max(result.duration_sec, 1) * 60:.0f}/min)\n")
 
     if result.by_domain:
         console.print("[dim]By domain:[/dim]")
         for domain, count in sorted(result.by_domain.items(), key=lambda x: -x[1]):
             console.print(f"  [cyan]{domain:<16}[/cyan] {count}")
+
+    # Show gap if there's a target
+    if to:
+        gap = max(0, to - new_total)
+        if gap > 0:
+            bar_len = 20
+            filled = int((new_total / to) * bar_len)
+            bar = "[green]" + "█" * filled + "[/green][dim]" + "░" * (bar_len - filled) + "[/dim]"
+            from rich.text import Text
+            console.print(f"\n  Progress: {Text.from_markup(bar)} [bold]{new_total}/{to}[/bold]")
+            console.print(f"  [dim]Run again:[/dim] orca data seed --to {to} --fast")
+        else:
+            console.print(f"\n  [green bold]✓[/green bold] Reached target of {to} examples!")
 
     console.print(f"\nNext: [bold]orca data curate[/bold]")
 
@@ -632,21 +661,253 @@ def train_run(
         raise typer.Exit(1)
 
 
+@train_app.command("status")
+def train_status():
+    """Show build status for all Atheris model variants."""
+    from rich.table import Table
+    from rich import box
+    from orca.train.variants import status, VARIANTS
+    from orca.data.pipeline import count_raw_examples
+
+    rows = status()
+    raw = count_raw_examples()
+
+    # Data readiness bar
+    bar_len = 20
+    filled = min(int((raw / 1000) * bar_len), bar_len)
+    color = "green" if raw >= 500 else "yellow" if raw >= 200 else "red"
+    bar = f"[{color}]" + "█" * filled + f"[/{color}][dim]" + "░" * (bar_len - filled) + "[/dim]"
+    console.print()
+    console.print(f"  Training data:  {raw}/1000 raw examples  {bar}")
+    console.print()
+
+    t = Table(box=box.SIMPLE_HEAD, header_style="bold dim", show_header=True)
+    t.add_column("Variant",   style="bold", width=12)
+    t.add_column("Base model",             width=36)
+    t.add_column("VRAM",  justify="right", width=6)
+    t.add_column("In Ollama",              width=10)
+    t.add_column("GGUF",                   width=8)
+    t.add_column("Merged",                 width=8)
+    t.add_column("Action")
+
+    for r in rows:
+        in_ollama = "[green]✓[/green]" if r["in_ollama"] else "[dim]—[/dim]"
+        gguf      = "[green]✓[/green]" if r["gguf_exists"] else "[dim]—[/dim]"
+        merged    = "[green]✓[/green]" if r["merged_exists"] else "[dim]—[/dim]"
+        v         = VARIANTS[r["variant"]]
+
+        if r["in_ollama"]:
+            action = f"[dim]ollama run {r['name']}[/dim]"
+        elif r["gguf_exists"]:
+            action = f"[cyan]orca train export {r['gguf_path']} --name {r['name']}[/cyan]"
+        else:
+            action = f"[yellow]orca train {r['variant']}[/yellow]"
+
+        t.add_row(
+            r["name"], v.base_model, f"{r['vram_gb']}GB",
+            in_ollama, gguf, merged, action,
+        )
+
+    console.print(t)
+    console.print()
+
+    # Build instructions
+    any_missing = any(not r["in_ollama"] for r in rows)
+    if any_missing:
+        console.print("[bold]Build pipeline:[/bold]")
+        if raw < 1000:
+            console.print(f"  1. [cyan]orca data seed --to 1000 --fast[/cyan]  [dim]# collect {1000-raw} more examples[/dim]")
+            console.print(f"  2. [cyan]orca data curate[/cyan]")
+            console.print(f"  3. [cyan]orca data format --format llama3 --split[/cyan]")
+            console.print(f"  4. [cyan]orca train nano[/cyan]          [dim]# train 3B model locally[/dim]")
+            console.print(f"     [cyan]orca train cloud --ssh ...[/cyan]  [dim]# train core/ultra on cloud GPU[/dim]")
+        else:
+            console.print(f"  1. [cyan]orca data curate && orca data format --format llama3 --split[/cyan]")
+            console.print(f"  2. [cyan]orca train nano[/cyan]  or  [cyan]orca train cloud --ssh ...[/cyan]")
+        console.print()
+    else:
+        console.print("[green bold]✓ All variants built and registered in Ollama[/green bold]\n")
+
+
+def _run_variant_train(variant_name: str, epochs: int | None, rank: int | None):
+    """Shared logic for orca train nano/core/ultra."""
+    from orca.train.config import TrainingConfig
+    from orca.train.finetune import train
+
+    cfg = TrainingConfig.preset(variant_name)
+    if epochs:
+        cfg.num_epochs = epochs
+    if rank:
+        cfg.lora.r = rank
+        cfg.lora.lora_alpha = rank * 2
+
+    from orca.train.variants import get_variant
+    v = get_variant(variant_name)
+
+    console.print(Panel(
+        f"[bold]Variant:[/bold]    {v.name}\n"
+        f"[bold]Base model:[/bold] {cfg.base_model}\n"
+        f"[bold]LoRA rank:[/bold]  {cfg.lora.r}\n"
+        f"[bold]Epochs:[/bold]     {cfg.num_epochs}\n"
+        f"[bold]VRAM needed:[/bold] {v.vram_gb}GB\n"
+        f"[bold]Output:[/bold]     {cfg.output_dir}",
+        title=f"[bold red]Atheris {v.name} — QLoRA Fine-Tune[/bold red]",
+        border_style="red",
+    ))
+
+    try:
+        meta = train(cfg, on_log=lambda m: console.print(f"[dim]{m}[/dim]"))
+        console.print(f"\n[green]Training complete![/green]")
+        console.print(f"Loss: {meta['train_loss']:.4f} | Time: {meta['duration_min']:.1f} min")
+        console.print(f"\nNext: [bold]orca train export {meta['merged_path']} --name {v.ollama_name}[/bold]")
+    except FileNotFoundError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1)
+    except ImportError as e:
+        console.print(f"[red]Missing training deps: {e}[/red]")
+        console.print("Run: [bold]pip install unsloth trl transformers datasets peft bitsandbytes accelerate[/bold]")
+        raise typer.Exit(1)
+
+
+@train_app.command("nano")
+def train_nano(
+    epochs: int = typer.Option(None, "--epochs", "-e"),
+    rank:   int = typer.Option(None, "--rank",   "-r"),
+):
+    """Fine-tune orca-nano (Qwen2.5-3B) — runs on 6GB+ VRAM."""
+    _run_variant_train("nano", epochs, rank)
+
+
+@train_app.command("core")
+def train_core(
+    epochs: int = typer.Option(None, "--epochs", "-e"),
+    rank:   int = typer.Option(None, "--rank",   "-r"),
+):
+    """Fine-tune orca-core (Llama-3.1-8B) — runs on 16GB+ VRAM."""
+    _run_variant_train("core", epochs, rank)
+
+
+@train_app.command("ultra")
+def train_ultra(
+    epochs: int = typer.Option(None, "--epochs", "-e"),
+    rank:   int = typer.Option(None, "--rank",   "-r"),
+):
+    """Fine-tune orca-ultra (Llama-3.1-70B) — cloud GPU only (48GB+ VRAM)."""
+    from orca.license import gate
+    gate("cloud_train")
+    _run_variant_train("ultra", epochs, rank)
+
+
 @train_app.command("eval")
 def train_eval(
-    model: str = typer.Argument(..., help="Path to merged model"),
+    model:     str  = typer.Argument(None, help="Ollama model name OR path to merged checkpoint"),
+    ollama:    str  = typer.Option(None,  "--ollama",    "-o", help="Evaluate a live Ollama model"),
+    host:      str  = typer.Option("http://localhost:11434", "--host", help="Ollama host"),
+    judge:     str  = typer.Option(None,  "--judge",     "-j", help="Separate judge model name"),
+    n_acc:     int  = typer.Option(None,  "--n-accuracy", help="Number of accuracy prompts (default: all 50)"),
+    n_style:   int  = typer.Option(10,    "--n-style",    help="Number of style prompts"),
+    ci:        bool = typer.Option(False, "--ci",          help="CI mode: exit 1 if score < threshold"),
+    threshold: float= typer.Option(40.0,  "--threshold",   help="Minimum passing score (default: 40)"),
 ):
-    """Evaluate a fine-tuned model."""
-    from orca.train.eval import ModelEvaluator
-    ev = ModelEvaluator(model, on_log=lambda m: console.print(f"[dim]{m}[/dim]"))
-    report = ev.full_report()
+    """Evaluate a model — works with live Ollama models (no GPU needed) or HF checkpoints.
+
+    Examples:
+      orca train eval --ollama orca-core          # evaluate live Ollama model
+      orca train eval --ollama orca-nano --ci     # CI mode with pass/fail
+      orca train eval /path/to/merged             # evaluate HF checkpoint (GPU needed)
+      orca train eval --ollama orca-core --ollama orca-nano  # (use compare instead)
+    """
+    from rich.table import Table
+    from rich import box
+
+    target = ollama or model
+    if not target:
+        console.print("[red]Specify a model: orca train eval --ollama orca-core[/red]")
+        raise typer.Exit(1)
+
+    # Detect if it's an Ollama model name vs a filesystem path
+    is_path = "/" in target or target.startswith("~") or target.startswith(".")
+
+    if is_path:
+        from orca.train.eval import ModelEvaluator
+        ev = ModelEvaluator(target, on_log=lambda m: console.print(f"[dim]{m}[/dim]"))
+        report = ev.full_report()
+    else:
+        from orca.train.eval import OllamaEvaluator
+        console.print(f"\n[bold cyan]◈ Atheris Eval — {target}[/bold cyan]")
+        console.print(f"  [dim]host:[/dim]   {host}")
+        console.print(f"  [dim]prompts:[/dim] {n_acc or 50} accuracy + {n_style} style\n")
+        ev = OllamaEvaluator(
+            target, ollama_host=host,
+            on_log=lambda m: console.print(f"  [dim]{m}[/dim]"),
+            judge_model=judge,
+        )
+        report = ev.full_report(n_accuracy=n_acc, n_style=n_style)
+
+    # Print summary panel
+    score = report["overall_score"]
+    color = "green" if score >= 60 else "yellow" if score >= 40 else "red"
+    console.print()
     console.print(Panel(
-        f"[bold]Score:[/bold]    [green]{report['overall_score']}/100[/green]\n"
-        f"[bold]Accuracy:[/bold] {report['accuracy']['accuracy']*100:.0f}%\n"
-        f"[bold]Style:[/bold]    {report['style']['style_score']}/10\n"
-        f"[bold]Speed:[/bold]    {report['speed']['tokens_per_sec']:.1f} tok/s",
-        title="[bold]Eval Report[/bold]",
-        border_style="magenta",
+        f"[bold]Model:[/bold]    {report['model']}\n"
+        f"[bold]Score:[/bold]    [{color} bold]{score}/100[/{color} bold]\n"
+        f"[bold]Accuracy:[/bold] {report['accuracy']['accuracy']*100:.1f}%  "
+        f"({report['accuracy']['n_prompts']} prompts)\n"
+        f"[bold]Style:[/bold]    {report['style']['style_score']:.1f}/10  "
+        f"({report['style']['n_samples']} samples)\n"
+        f"[bold]Speed:[/bold]    {report['speed'].get('tokens_per_sec', 0):.1f} tok/s",
+        title="[bold]◈ Atheris Eval Report[/bold]",
+        border_style=color,
+    ))
+
+    if ci:
+        if score < threshold:
+            console.print(f"[red bold]✗ CI FAIL — score {score} < threshold {threshold}[/red bold]")
+            raise typer.Exit(1)
+        console.print(f"[green bold]✓ CI PASS — score {score} ≥ threshold {threshold}[/green bold]")
+
+
+@train_app.command("compare")
+def train_compare(
+    model_a: str = typer.Argument(..., help="First Ollama model name"),
+    model_b: str = typer.Argument(..., help="Second Ollama model name"),
+    host:    str = typer.Option("http://localhost:11434", "--host"),
+    n:       int = typer.Option(20, "--n", help="Number of prompts to compare"),
+):
+    """Side-by-side comparison of two Ollama models on the same prompts."""
+    from rich.table import Table
+    from rich import box
+    from orca.train.eval import OllamaEvaluator
+
+    console.print(f"\n[bold cyan]◈ Atheris Compare: {model_a} vs {model_b}[/bold cyan]\n")
+
+    with console.status(f"[dim]Running {n} prompts on both models...[/dim]"):
+        result = OllamaEvaluator.compare(model_a, model_b, host=host, n=n)
+
+    t = Table(box=box.SIMPLE_HEAD, header_style="bold dim", show_header=True)
+    t.add_column("Prompt", width=55)
+    t.add_column(model_a, justify="right", width=10)
+    t.add_column(model_b, justify="right", width=10)
+    t.add_column("Winner", width=16)
+
+    for r in result["results"]:
+        wa = f"[green]{r[model_a]*100:.0f}%[/green]" if r["winner"] == model_a else f"{r[model_a]*100:.0f}%"
+        wb = f"[green]{r[model_b]*100:.0f}%[/green]" if r["winner"] == model_b else f"{r[model_b]*100:.0f}%"
+        win = f"[green]{r['winner']}[/green]" if r["winner"] != "tie" else "[dim]tie[/dim]"
+        t.add_row(r["prompt"][:54], wa, wb, win)
+
+    console.print(t)
+    console.print()
+
+    winner = result["winner"]
+    console.print(Panel(
+        f"[bold]{model_a}:[/bold]  {result['avg_a']*100:.1f}%  ({result['wins_a']} wins)\n"
+        f"[bold]{model_b}:[/bold]  {result['avg_b']*100:.1f}%  ({result['wins_b']} wins)\n"
+        f"[bold]Ties:[/bold]     {result['ties']}\n\n"
+        f"[bold]Winner:[/bold]   [green bold]{winner}[/green bold]" if winner != "tie"
+        else f"[bold]Result:[/bold]   [dim]tie[/dim]",
+        title="[bold]Comparison Summary[/bold]",
+        border_style="cyan",
     ))
 
 

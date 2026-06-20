@@ -102,6 +102,34 @@ class TrainingConfig:
             cfg.lora.lora_alpha = 128
             cfg.batch_size = 4
             cfg.load_in_4bit = True
-            cfg.model_name = "orca-70b"
-            cfg.output_dir = str(MODELS_DIR / "orca-70b-qlora")
+            cfg.model_name = "orca-ultra"
+            cfg.output_dir = str(MODELS_DIR / "orca-ultra-qlora")
+        # ── Atheris named variants ─────────────────────────────────────────────
+        elif name == "nano":
+            cfg.base_model = "unsloth/Qwen2.5-3B-Instruct"
+            cfg.model_name = "orca-nano"
+            cfg.lora.r = 32
+            cfg.lora.lora_alpha = 64
+            cfg.batch_size = 4
+            cfg.gradient_accumulation_steps = 4
+            cfg.max_seq_length = 4096
+            cfg.output_dir = str(MODELS_DIR / "orca-nano-qlora")
+        elif name == "core":
+            cfg.base_model = "unsloth/Meta-Llama-3.1-8B-Instruct"
+            cfg.model_name = "orca-core"
+            cfg.lora.r = 64
+            cfg.lora.lora_alpha = 128
+            cfg.batch_size = 2
+            cfg.gradient_accumulation_steps = 8
+            cfg.max_seq_length = 8192
+            cfg.output_dir = str(MODELS_DIR / "orca-core-qlora")
+        elif name == "ultra":
+            cfg.base_model = "unsloth/Meta-Llama-3.1-70B-Instruct"
+            cfg.model_name = "orca-ultra"
+            cfg.lora.r = 64
+            cfg.lora.lora_alpha = 128
+            cfg.batch_size = 4
+            cfg.load_in_4bit = True
+            cfg.max_seq_length = 8192
+            cfg.output_dir = str(MODELS_DIR / "orca-ultra-qlora")
         return cfg
