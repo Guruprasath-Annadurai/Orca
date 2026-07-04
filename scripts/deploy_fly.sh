@@ -11,9 +11,9 @@
 
 set -euo pipefail
 
-APP="atheris-demo"
+APP="orca-demo"
 REGION="ord"
-VOLUME="atheris_data"
+VOLUME="orca_data"
 
 # ── Check flyctl ─────────────────────────────────────────────────────────────
 if ! command -v fly &>/dev/null; then
@@ -25,7 +25,7 @@ fi
 # ── Build wheel ──────────────────────────────────────────────────────────────
 echo "▶  Building wheel..."
 uv build --wheel
-WHEEL=$(ls dist/atheris_ai-*.whl | tail -1)
+WHEEL=$(ls dist/orca_ai-*.whl | tail -1)
 echo "   Built: $WHEEL"
 
 # ── First-time setup ─────────────────────────────────────────────────────────

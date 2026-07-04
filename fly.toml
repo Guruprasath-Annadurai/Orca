@@ -1,8 +1,8 @@
-# Atheris — Fly.io deployment configuration
+# Orca — Fly.io deployment configuration
 # Deploy: fly launch --copy-config
 # Docs:   https://fly.io/docs/
 
-app = "atheris-demo"
+app = "orca-demo"
 primary_region = "ord"        # Chicago — change to nearest: iad, lax, sea, lhr, fra, sin, syd
 kill_signal    = "SIGINT"
 kill_timeout   = 5

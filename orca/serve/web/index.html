@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ATHERIS — Private Intelligence</title>
+<title>ORCA — Private Intelligence</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap');
 
@@ -1440,8 +1440,8 @@ body {
 <div id="auth-overlay">
   <div class="auth-box">
     <div class="auth-brand">
-      <div class="auth-wordmark">ATHERIS</div>
-      <div class="auth-tagline">Private Intelligence &nbsp;/&nbsp; Powered by Orca</div>
+      <div class="auth-wordmark">ORCA</div>
+      <div class="auth-tagline">Private Intelligence &nbsp;/&nbsp; Powered by Atheris</div>
     </div>
     <div class="auth-tabs">
       <button class="auth-tab active" id="tab-signin" onclick="switchAuthTab('signin')">Sign In</button>
@@ -1538,7 +1538,7 @@ body {
       <circle cx="20" cy="9" r="1" fill="#fff" opacity="0.6"/>
     </svg>
     <div>
-      <div class="logo-text">ATHERIS</div>
+      <div class="logo-text">ORCA</div>
       <div class="logo-ver">VER 1.0.0 &nbsp;/&nbsp; ATHERIS.AI</div>
     </div>
   </div>
@@ -1648,8 +1648,8 @@ body {
       <div id="welcome">
 
         <div class="welcome-brand">
-          <div class="welcome-wordmark">ATHERIS</div>
-          <div class="welcome-tagline">Private Intelligence &nbsp;/&nbsp; Powered by Orca &nbsp;/&nbsp; 100% Local</div>
+          <div class="welcome-wordmark">ORCA</div>
+          <div class="welcome-tagline">Private Intelligence &nbsp;/&nbsp; Powered by Atheris &nbsp;/&nbsp; 100% Local</div>
         </div>
 
         <!-- Sub-agent pods -->
@@ -1665,14 +1665,14 @@ body {
                 <circle cx="11" cy="11" r="7"/>
                 <line x1="16.5" y1="16.5" x2="21" y2="21"/>
               </svg>
-              <div class="pod-name">ATHERIS<br>RESEARCH</div>
+              <div class="pod-name">ORCA<br>RESEARCH</div>
             </div>
             <div class="pod" onclick="sendStarter('Write a Python function to fetch and parse JSON from an API endpoint with error handling.')">
               <svg class="pod-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
                 <polyline points="16 18 22 12 16 6"/>
                 <polyline points="8 6 2 12 8 18"/>
               </svg>
-              <div class="pod-name">ATHERIS<br>CODE</div>
+              <div class="pod-name">ORCA<br>CODE</div>
             </div>
             <div class="pod" onclick="sendStarter('Analyze the competitive landscape for private AI assistants and identify the biggest market opportunity.')">
               <svg class="pod-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
@@ -1680,7 +1680,7 @@ body {
                 <line x1="12" y1="20" x2="12" y2="4"/>
                 <line x1="6" y1="20" x2="6" y2="14"/>
               </svg>
-              <div class="pod-name">ATHERIS<br>ANALYST</div>
+              <div class="pod-name">ORCA<br>ANALYST</div>
             </div>
             <div class="pod" onclick="sendStarter('Write a concise, compelling one-page pitch for Orca — a private self-owned AI system.')">
               <svg class="pod-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
@@ -1689,7 +1689,7 @@ body {
                 <line x1="16" y1="13" x2="8" y2="13"/>
                 <line x1="16" y1="17" x2="8" y2="17"/>
               </svg>
-              <div class="pod-name">ATHERIS<br>WRITER</div>
+              <div class="pod-name">ORCA<br>WRITER</div>
             </div>
             <div class="pod" onclick="sendStarter('Critically review my business model for Orca and identify the weakest points an investor would challenge.')">
               <svg class="pod-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
@@ -1700,7 +1700,7 @@ body {
                 <line x1="3" y1="12" x2="1" y2="12"/>
                 <line x1="23" y1="12" x2="21" y2="12"/>
               </svg>
-              <div class="pod-name">ATHERIS<br>CRITIC</div>
+              <div class="pod-name">ORCA<br>CRITIC</div>
             </div>
             <div class="pod" onclick="sendStarter('Design the technical architecture for a scalable private AI platform that can be sold to enterprises.')">
               <svg class="pod-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
@@ -1709,7 +1709,7 @@ body {
                 <line x1="2" y1="8.5" x2="22" y2="8.5"/>
                 <line x1="2" y1="15.5" x2="22" y2="15.5"/>
               </svg>
-              <div class="pod-name">ATHERIS<br>ARCHITECT</div>
+              <div class="pod-name">ORCA<br>ARCHITECT</div>
             </div>
           </div>
         </div>
@@ -2405,7 +2405,7 @@ function appendOrcaMsg(text) {
   const el = document.createElement('div');
   el.className = 'msg-row orca-row';
   el.innerHTML = `
-    <div class="msg-role">ATHERIS</div>
+    <div class="msg-role">ORCA</div>
     <div class="msg-body">${mdToHtml(text)}</div>
   `;
   document.getElementById('messages').appendChild(el);
@@ -2417,7 +2417,7 @@ function appendThinking() {
   const el = document.createElement('div');
   el.className = 'thinking-row';
   el.innerHTML = `
-    <div class="thinking-role">ATHERIS</div>
+    <div class="thinking-role">ORCA</div>
     <div class="thinking-body">
       <span class="thinking-text">PROCESSING</span>
       <div class="pulse-dots"><span></span><span></span><span></span></div>
@@ -2624,7 +2624,7 @@ async function doSignup() {
 function _onAuthSuccess(data) {
   _authToken = data.token;
   _authUser  = data.user;
-  localStorage.setItem('atheris_token', data.token);
+  localStorage.setItem('orca_token', data.token);
   document.getElementById('auth-overlay').classList.add('hidden');
   _updateUserUI(data.user, data.usage, data.limits);
 }
@@ -2683,7 +2683,7 @@ function showUserMenu() {
 
 function doLogout() {
   _authToken = null; _authUser = null;
-  localStorage.removeItem('atheris_token');
+  localStorage.removeItem('orca_token');
   document.getElementById('auth-overlay').classList.remove('hidden');
   document.getElementById('user-chip').classList.remove('visible');
   document.getElementById('usage-bar-wrap').style.display = 'none';
@@ -2706,11 +2706,11 @@ async function initAuth() {
     history.replaceState({}, '', '/');
   }
 
-  const stored = localStorage.getItem('atheris_token');
+  const stored = localStorage.getItem('orca_token');
   if (!stored) return;
   try {
     const r = await fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + stored } });
-    if (!r.ok) { localStorage.removeItem('atheris_token'); return; }
+    if (!r.ok) { localStorage.removeItem('orca_token'); return; }
     const d = await r.json();
     _authToken = stored;
     _authUser  = d.user;
@@ -2991,7 +2991,7 @@ function exportConversation() {
   const blob = new Blob([md], { type: 'text/markdown' });
   const a    = document.createElement('a');
   a.href     = URL.createObjectURL(blob);
-  a.download = `atheris-${sessionId ? sessionId.slice(0,8) : 'conversation'}.md`;
+  a.download = `orca-${sessionId ? sessionId.slice(0,8) : 'conversation'}.md`;
   a.click();
   URL.revokeObjectURL(a.href);
 }

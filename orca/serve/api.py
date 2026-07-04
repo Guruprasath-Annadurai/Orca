@@ -54,7 +54,7 @@ from orca.code import run_code
 _START_TIME = time.time()
 WEB_DIR = Path(__file__).parent / "web"
 
-app = FastAPI(title="Atheris API", version="1.0.0", docs_url=None, redoc_url=None)
+app = FastAPI(title="Orca API", version="1.0.0", docs_url=None, redoc_url=None)
 
 app.add_middleware(
     CORSMiddleware,
@@ -401,14 +401,14 @@ async def export_session(session_id: str):
     sess = _get_session(session_id)
     msgs = sess.memory.messages() if hasattr(sess.memory, "messages") else []
     title = _session_titles.get(session_id, f"Session {session_id[:8].upper()}")
-    lines = [f"# {title}", f"\n_Exported from Atheris — {time.strftime('%Y-%m-%d %H:%M')}_\n", "---\n"]
+    lines = [f"# {title}", f"\n_Exported from Orca — {time.strftime('%Y-%m-%d %H:%M')}_\n", "---\n"]
     for m in msgs:
-        role = "**You**" if m.get("role") == "user" else "**Atheris**"
+        role = "**You**" if m.get("role") == "user" else "**Orca**"
         lines.append(f"{role}\n\n{m.get('content', '')}\n\n---\n")
     md = "\n".join(lines)
     return PlainTextResponse(
         md,
-        headers={"Content-Disposition": f'attachment; filename="atheris-{session_id[:8]}.md"'},
+        headers={"Content-Disposition": f'attachment; filename="orca-{session_id[:8]}.md"'},
     )
 
 
@@ -424,7 +424,7 @@ async def save_session(req: ChatRequest):
 
 @app.get("/api/models")
 async def list_models():
-    """Return which Atheris model variants are available in Ollama."""
+    """Return which Orca model variants are available in Ollama."""
     import urllib.request
     try:
         req = urllib.request.Request(f"{CONFIG.ollama.host}/api/tags", method="GET")

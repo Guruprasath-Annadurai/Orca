@@ -30,7 +30,7 @@ if $TEST_PYPI; then
     --password "${PYPI_TOKEN:?PYPI_TOKEN not set}" \
     dist/*
   echo "✓  Uploaded. Install with:"
-  echo "   pip install --index-url https://test.pypi.org/simple/ atheris-ai"
+  echo "   pip install --index-url https://test.pypi.org/simple/ orca-ai"
 else
   echo "▶  Uploading to PyPI..."
   python -m twine upload \
@@ -38,7 +38,7 @@ else
     --password "${PYPI_TOKEN:?PYPI_TOKEN not set}" \
     dist/*
   echo "✓  Published! Install with:"
-  echo "   pip install atheris-ai"
-  echo "   pip install atheris-ai[docs]   # PDF/DOCX support + ChromaDB"
-  echo "   pip install atheris-ai[all]    # everything"
+  echo "   pip install orca-ai"
+  echo "   pip install orca-ai[docs]   # PDF/DOCX support + ChromaDB"
+  echo "   pip install orca-ai[all]    # everything"
 fi

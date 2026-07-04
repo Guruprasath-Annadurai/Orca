@@ -3,13 +3,13 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "atheris-ai"
+name = "orca-ai"
 version = "1.0.0"
-description = "Atheris — 100% private local AI. Document Q&A, code interpreter, voice input. Your hardware, your data, zero cloud."
+description = "Orca — 100% private local AI, built by Atheris. Document Q&A, code interpreter, voice input. Your hardware, your data, zero cloud."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "Atheris Systems", email = "hello@atheris.ai" }]
+authors = [{ name = "Atheris", email = "hello@atheris.ai" }]
 keywords = ["ai", "llm", "local", "private", "ollama", "agent", "rag", "document-qa"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -72,8 +72,7 @@ train  = [
 ]
 
 [project.scripts]
-orca    = "orca.cli:app"
-atheris = "orca.cli:app"
+orca = "orca.cli:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["orca"]
