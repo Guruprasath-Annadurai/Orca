@@ -615,6 +615,123 @@ body {
   color: var(--muted);
 }
 
+/* ── Explain This Answer ───────────────────────────────────────────────────── */
+.explain-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line2);
+  padding: 3px 9px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.15s;
+}
+.explain-btn:hover { color: var(--white); border-color: var(--white); }
+
+#explain-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+#explain-overlay.open { display: flex; }
+
+#explain-modal {
+  width: 640px;
+  max-width: 92vw;
+  max-height: 84vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line2);
+  padding: 24px;
+}
+
+.explain-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.explain-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--white);
+  text-transform: uppercase;
+}
+.explain-close {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.explain-close:hover { color: var(--white); }
+
+.explain-section {
+  margin-bottom: 18px;
+}
+.explain-section-title {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.explain-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--surface2);
+}
+.explain-row-label { color: var(--dim); flex-shrink: 0; }
+.explain-row-value { color: var(--text); text-align: right; word-break: break-word; }
+
+.explain-step {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  padding: 5px 8px;
+  background: var(--surface2);
+  margin-bottom: 4px;
+}
+.explain-step-timing { color: var(--muted); font-family: var(--mono); font-size: 10px; }
+
+.explain-citation {
+  font-size: 11px;
+  padding: 6px 8px;
+  background: var(--surface2);
+  border-left: 2px solid var(--line2);
+  margin-bottom: 6px;
+}
+.explain-citation-src { color: var(--muted); font-family: var(--mono); font-size: 9px; margin-bottom: 3px; }
+
+.explain-confidence-bar {
+  height: 4px;
+  background: var(--surface2);
+  margin-top: 6px;
+  overflow: hidden;
+}
+.explain-confidence-fill {
+  height: 100%;
+  background: #5a9a6a;
+}
+.explain-empty { color: var(--muted); font-size: 12px; font-style: italic; }
+
 /* Thinking */
 .thinking-row {
   display: flex;
@@ -1813,6 +1930,22 @@ body {
   </div>
 </div>
 
+<!-- Explain This Answer Modal -->
+<div id="explain-overlay" onclick="if(event.target===this) closeExplainModal()">
+  <div id="explain-modal">
+    <div class="explain-header">
+      <div class="explain-title">Explain This Answer</div>
+      <button class="explain-close" onclick="closeExplainModal()">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <line x1="2" y1="2" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="14" y1="2" x2="2" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div id="explain-body"><div class="explain-empty">Loading...</div></div>
+  </div>
+</div>
+
 <!-- Memory Modal -->
 <div id="modal-overlay">
   <div id="modal" class="bracketed">
@@ -2288,6 +2421,14 @@ async function sendMessage() {
               orcaEl.insertAdjacentElement('afterend', ragBar);
               _ragSources = null;
             }
+            if (ev.message_id && orcaEl) {
+              const explainBtn = document.createElement('button');
+              explainBtn.className = 'explain-btn';
+              explainBtn.title = 'Explain this answer';
+              explainBtn.innerHTML = '&#x1F50E; Explain';
+              explainBtn.onclick = () => openExplainModal(sessionId, ev.message_id);
+              orcaEl.appendChild(explainBtn);
+            }
             if (sessionId && _firstMessageInSession) {
               autoTitleSession(sessionId, _firstMessageInSession);
               _firstMessageInSession = null;
@@ -2477,6 +2618,107 @@ function mdToHtml(md) {
 
 function esc(t) {
   return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Explain This Answer modal ─────────────────────────────────────────────────
+
+async function openExplainModal(sid, messageId) {
+  document.getElementById('explain-overlay').classList.add('open');
+  const body = document.getElementById('explain-body');
+  body.innerHTML = '<div class="explain-empty">Loading...</div>';
+
+  try {
+    const resp = await fetch(`/api/explain/${sid}/${messageId}`, { headers: _authHeaders() });
+    const data = await resp.json();
+    if (!resp.ok) {
+      body.innerHTML = `<div class="explain-empty">${esc(data.error || 'No explain data available.')}</div>`;
+      return;
+    }
+    body.innerHTML = renderExplainData(data);
+  } catch (e) {
+    body.innerHTML = `<div class="explain-empty">Request failed: ${esc(e.message)}</div>`;
+  }
+}
+
+function closeExplainModal() {
+  document.getElementById('explain-overlay').classList.remove('open');
+}
+
+function renderExplainData(data) {
+  const qi = data.query_intelligence || {};
+  const chain = data.retrieval_chain || {};
+  const conf = data.confidence || {};
+  const citations = data.citations || {};
+  const reasoning = data.reasoning || {};
+
+  let html = '';
+
+  // Reasoning
+  html += `<div class="explain-section">
+    <div class="explain-section-title">Agent Reasoning</div>
+    <div class="explain-row"><span class="explain-row-label">Plan</span><span class="explain-row-value">${esc(reasoning.plan_action || 'direct')}</span></div>
+    <div class="explain-row"><span class="explain-row-label">Tools used</span><span class="explain-row-value">${reasoning.tools_used && reasoning.tools_used.length ? esc(reasoning.tools_used.join(', ')) : 'none'}</span></div>
+  </div>`;
+
+  // Query intelligence (only if RAG ran)
+  if (qi.original_query) {
+    html += `<div class="explain-section">
+      <div class="explain-section-title">Query Intelligence</div>
+      <div class="explain-row"><span class="explain-row-label">Original</span><span class="explain-row-value">${esc(qi.original_query)}</span></div>`;
+    if (qi.rewritten_query && qi.rewritten_query !== qi.original_query) {
+      html += `<div class="explain-row"><span class="explain-row-label">Rewritten</span><span class="explain-row-value">${esc(qi.rewritten_query)}</span></div>`;
+    }
+    html += `<div class="explain-row"><span class="explain-row-label">Complexity</span><span class="explain-row-value">${esc(qi.complexity || 'simple')}</span></div>`;
+    if (qi.sub_queries && qi.sub_queries.length) {
+      html += `<div class="explain-row"><span class="explain-row-label">Sub-questions</span><span class="explain-row-value">${qi.sub_queries.map(esc).join('; ')}</span></div>`;
+    }
+    html += `<div class="explain-row"><span class="explain-row-label">HyDE used</span><span class="explain-row-value">${qi.used_hyde ? 'yes' : 'no'}</span></div>
+    </div>`;
+  }
+
+  // Retrieval chain
+  if (chain.steps && chain.steps.length) {
+    html += `<div class="explain-section">
+      <div class="explain-section-title">Retrieval Chain (${chain.rounds || 1} round${(chain.rounds||1) > 1 ? 's' : ''})</div>`;
+    chain.steps.forEach(s => {
+      html += `<div class="explain-step"><span>${esc(s.detail)}</span><span class="explain-step-timing">${s.duration_ms}ms</span></div>`;
+    });
+    html += `</div>`;
+  }
+
+  // Confidence
+  if (conf.sufficiency_confidence !== undefined && conf.sources && conf.sources.length) {
+    const pct = Math.round((conf.sufficiency_confidence || 0) * 100);
+    html += `<div class="explain-section">
+      <div class="explain-section-title">Confidence &amp; Sources</div>
+      <div class="explain-row"><span class="explain-row-label">Sufficiency confidence</span><span class="explain-row-value">${pct}%</span></div>
+      <div class="explain-confidence-bar"><div class="explain-confidence-fill" style="width:${pct}%"></div></div>
+      <div class="explain-row" style="margin-top:8px"><span class="explain-row-label">Sources</span><span class="explain-row-value">${conf.sources.map(esc).join(', ')}</span></div>`;
+    if (conf.contradictions && conf.contradictions.length) {
+      html += `<div class="explain-row"><span class="explain-row-label">⚠ Contradictions</span><span class="explain-row-value">${conf.contradictions.map(esc).join('; ')}</span></div>`;
+    }
+    html += `</div>`;
+  }
+
+  // Citations
+  const citKeys = Object.keys(citations);
+  if (citKeys.length) {
+    html += `<div class="explain-section"><div class="explain-section-title">Citations</div>`;
+    citKeys.forEach(cid => {
+      const c = citations[cid];
+      html += `<div class="explain-citation">
+        <div class="explain-citation-src">[${esc(cid)}] ${esc(c.filename)} §${(c.chunk_idx||0)+1}</div>
+        ${esc((c.text||'').slice(0,240))}${(c.text||'').length > 240 ? '…' : ''}
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if (!qi.original_query && !citKeys.length) {
+    html += `<div class="explain-empty">No document retrieval was used for this answer — direct model response${reasoning.tools_used && reasoning.tools_used.length ? ' with tool use.' : '.'}</div>`;
+  }
+
+  return html;
 }
 
 // ── Memory modal ──────────────────────────────────────────────────────────────

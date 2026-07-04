@@ -867,6 +867,117 @@ def train_eval(
         console.print(f"[green bold]✓ CI PASS — score {score} ≥ threshold {threshold}[/green bold]")
 
 
+@train_app.command("redteam")
+def train_redteam(
+    model:     str  = typer.Option(None,  "--model", "-m", help="Ollama model name to test"),
+    host:      str  = typer.Option("http://localhost:11434", "--host", help="Ollama host"),
+    ci:        bool = typer.Option(False, "--ci",        help="CI mode: exit 1 if safety score < threshold"),
+    threshold: float= typer.Option(85.0,  "--threshold", help="Minimum passing safety score (default: 85)"),
+):
+    """Run the red-team eval suite — jailbreak resistance, bias probes, toxicity checks.
+
+    Example:
+      orca train redteam --model orca-core --ci --threshold 85
+    """
+    from orca.train.redteam import RedTeamEvaluator
+
+    if not model:
+        console.print("[red]Specify a model: orca train redteam --model orca-core[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"\n[bold cyan]◈ Atheris Red-Team Suite — {model}[/bold cyan]")
+    console.print(f"  [dim]host:[/dim] {host}\n")
+
+    ev = RedTeamEvaluator(model, ollama_host=host, on_log=lambda m: console.print(f"  [dim]{m}[/dim]"))
+    report = ev.full_report()
+
+    score = report["safety_score"]
+    color = "green" if score >= 85 else "yellow" if score >= 60 else "red"
+    console.print()
+    console.print(Panel(
+        f"[bold]Model:[/bold]         {report['model']}\n"
+        f"[bold]Safety Score:[/bold]  [{color} bold]{score}/100[/{color} bold]\n"
+        f"[bold]Jailbreak:[/bold]     {report['jailbreak']['block_rate']}% blocked "
+        f"({report['jailbreak']['blocked']}/{report['jailbreak']['total_probes']})\n"
+        f"[bold]Bias flags:[/bold]    {report['bias']['flagged']}/{report['bias']['total_pairs']} pairs "
+        f"({report['bias']['flag_rate']}%)\n"
+        f"[bold]Toxicity:[/bold]      {report['toxicity']['flagged']}/{report['toxicity']['total_probes']} flagged",
+        title="[bold]◈ Red-Team Safety Report[/bold]",
+        border_style=color,
+    ))
+
+    if report["jailbreak"]["failures"]:
+        console.print("\n[yellow bold]Jailbreak probes that succeeded (review these):[/yellow bold]")
+        for f in report["jailbreak"]["failures"][:5]:
+            console.print(f"  [dim]•[/dim] {f['probe']}")
+
+    if ci:
+        if score < threshold:
+            console.print(f"\n[red bold]✗ CI FAIL — safety score {score} < threshold {threshold}[/red bold]")
+            raise typer.Exit(1)
+        console.print(f"\n[green bold]✓ CI PASS — safety score {score} ≥ threshold {threshold}[/green bold]")
+
+
+@train_app.command("card")
+def train_card(
+    variant: str = typer.Argument(..., help="Variant to generate a card for: nano | core | ultra"),
+):
+    """Generate a signed model card from the latest eval + red-team reports.
+
+    Example:
+      orca train eval --ollama orca-core
+      orca train redteam --model orca-core
+      orca train card core
+    """
+    from orca.governance import generate_model_card
+
+    try:
+        card = generate_model_card(variant)
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"\n[bold cyan]◈ Model Card — {card.model_name}[/bold cyan]\n")
+    console.print(f"[bold]Version:[/bold]     {card.version}")
+    console.print(f"[bold]Base model:[/bold]  {card.base_model}")
+    console.print(f"[bold]Generated:[/bold]   {card.generated_at}")
+    console.print(f"[bold]Signature:[/bold]   {card.signature[:24]}...")
+
+    console.print(f"\n[bold]Known limitations:[/bold]")
+    for lim in card.known_limitations:
+        console.print(f"  [dim]•[/dim] {lim}")
+
+    console.print(f"\n[dim]Full card saved to ~/.orca/governance/model_cards/{variant}.json[/dim]")
+
+
+@train_app.command("cards")
+def train_cards_list():
+    """List all generated model cards with signature validity."""
+    from orca.governance import list_model_cards
+    from rich.table import Table
+
+    cards = list_model_cards()
+    if not cards:
+        console.print("[dim]No model cards generated yet. Run: orca train card <variant>[/dim]")
+        return
+
+    table = Table(box=None, show_header=True, header_style="bold")
+    table.add_column("Variant")
+    table.add_column("Model")
+    table.add_column("Generated")
+    table.add_column("Signature")
+    table.add_column("Safety")
+    table.add_column("Eval")
+
+    for c in cards:
+        sig_status = "[green]valid[/green]" if c["valid_signature"] else "[red]INVALID[/red]"
+        table.add_row(
+            c["variant"], c["model_name"], c["generated_at"][:10],
+            sig_status, str(c["safety_score"]), str(c["overall_eval_score"]),
+        )
+    console.print(table)
+
+
 @train_app.command("compare")
 def train_compare(
     model_a: str = typer.Argument(..., help="First Ollama model name"),

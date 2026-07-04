@@ -49,6 +49,7 @@ from orca.docs import (
     chunk_text, DocStore, register_doc, unregister_doc, list_docs,
     run_deep_rag,
 )
+from orca.brain.explainability import ExplainStore, build_from_rag_result
 from orca.code import run_code
 
 _START_TIME = time.time()
@@ -95,6 +96,7 @@ class _Session:
             ])
         self.brain = brain
         self.doc_store = DocStore(session_id=session_id, ollama_host=CONFIG.ollama.host)
+        self.explain_store = ExplainStore()
         self.last_active = time.time()
 
     def touch(self):
@@ -291,6 +293,8 @@ async def stream_chat(
         if rag_result.context_block:
             enriched = f"[Document context — cite sources as [D1], [D2], etc.]\n{rag_result.context_block}\n\n{enriched}"
 
+    message_id = str(uuid.uuid4())
+
     async def _event_stream() -> AsyncIterator[str]:
         # Send session_id first
         yield f"data: {json.dumps({'type': 'session', 'session_id': sess.id})}\n\n"
@@ -299,6 +303,7 @@ async def stream_chat(
 
         full = ""
         tool_names: list[str] = []
+        plan_action = "direct"
 
         try:
             gen, trace = await asyncio.to_thread(
@@ -314,6 +319,7 @@ async def stream_chat(
                 await asyncio.sleep(0)
 
             tool_names = [tc.tool for tc in trace.tool_calls]
+            plan_action = trace.plan_action
 
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'text': str(e)})}\n\n"
@@ -329,7 +335,13 @@ async def stream_chat(
         audit.log("stream_chat", user_id=user.id if user else None,
                   detail={"model": sess.model_variant, "tools": tool_names})
 
-        yield f"data: {json.dumps({'type': 'done', 'tools': tool_names})}\n\n"
+        # Explainability: capture the full retrieval/reasoning trace for this
+        # message, keyed by message_id so the frontend "Explain" button can
+        # fetch it on demand without bloating every SSE payload.
+        explain_record = build_from_rag_result(message_id, rag_result, plan_action, tool_names)
+        sess.explain_store.add(explain_record)
+
+        yield f"data: {json.dumps({'type': 'done', 'tools': tool_names, 'message_id': message_id})}\n\n"
 
     return StreamingResponse(
         _event_stream(),
@@ -394,6 +406,23 @@ async def set_session_title(session_id: str, req: TitleRequest):
     title = req.title.strip()[:80]
     _save_title(session_id, title)
     return {"ok": True, "title": title}
+
+
+@app.get("/api/explain/{session_id}/{message_id}")
+async def explain_answer(session_id: str, message_id: str):
+    """
+    'Explain this answer' — full retrieval chain, query intelligence, citation
+    DNA, sufficiency confidence, contradictions, and agent reasoning trace
+    for a specific assistant message.
+    """
+    sess = _get_session(session_id)
+    record = sess.explain_store.get(message_id)
+    if record is None:
+        return JSONResponse(
+            {"error": "No explain data found for this message. It may have expired (max 50 kept per session) or belong to a different session."},
+            status_code=404,
+        )
+    return record.to_dict()
 
 
 @app.get("/api/session/{session_id}/export")
@@ -680,6 +709,60 @@ async def admin_audit(
     admin: User = Depends(require_permission("audit_read")),
 ):
     return {"logs": audit.recent(limit=limit)}
+
+
+@app.get("/api/admin/audit/verify")
+async def admin_audit_verify(
+    start_seq: int = 0,
+    end_seq: int | None = None,
+    admin: User = Depends(require_permission("audit_read")),
+):
+    """Recompute the hash chain and report any tampering — the compliance check."""
+    return audit.verify_chain(start_seq=start_seq, end_seq=end_seq)
+
+
+@app.get("/api/admin/audit/export")
+async def admin_audit_export(
+    start_seq: int = 0,
+    end_seq: int | None = None,
+    admin: User = Depends(require_permission("audit_read")),
+):
+    """Court-admissible export: full entries + verification + a top-level signature."""
+    export = audit.export_for_audit(start_seq=start_seq, end_seq=end_seq)
+    return JSONResponse(
+        export,
+        headers={"Content-Disposition": f'attachment; filename="orca-audit-export-{int(time.time())}.json"'},
+    )
+
+
+@app.get("/api/admin/governance/cards")
+async def admin_list_model_cards(admin: User = Depends(require_permission("audit_read"))):
+    """List every generated model card with a quick signature-validity check."""
+    from orca.governance import list_model_cards
+    return {"cards": list_model_cards()}
+
+
+@app.get("/api/admin/governance/cards/{variant}")
+async def admin_get_model_card(variant: str, admin: User = Depends(require_permission("audit_read"))):
+    """Full model card for a variant (nano/core/ultra), including safety scores and limitations."""
+    from orca.governance import load_model_card, verify_model_card
+    card = load_model_card(variant)
+    if card is None:
+        return JSONResponse({"error": f"No model card found for variant '{variant}'. Run `orca train card {variant}` first."}, status_code=404)
+    verification = verify_model_card(variant)
+    return {"card": card.to_dict(), "verification": verification}
+
+
+@app.post("/api/admin/governance/cards/{variant}/generate")
+async def admin_generate_model_card(variant: str, admin: User = Depends(require_permission("manage_users"))):
+    """Regenerate a model card from the latest eval + red-team reports on disk."""
+    from orca.governance import generate_model_card
+    try:
+        card = generate_model_card(variant)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    audit.log("model_card_generated", user_id=admin.id, detail={"variant": variant})
+    return {"card": card.to_dict()}
 
 
 @app.get("/api/admin/stats")
