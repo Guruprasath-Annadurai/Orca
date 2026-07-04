@@ -47,6 +47,7 @@ from orca.variants.ultra import OrcaUltra
 from orca.docs import (
     extract, SUPPORTED_EXTENSIONS, MAX_FILE_SIZE,
     chunk_text, DocStore, register_doc, unregister_doc, list_docs,
+    run_deep_rag,
 )
 from orca.code import run_code
 
@@ -272,20 +273,29 @@ async def stream_chat(
     mem_ctx = sess.memory.recall_context(req.message, n=3)
     enriched = f"[Relevant memory]\n{mem_ctx}\n\n{req.message}" if mem_ctx else req.message
 
-    # RAG: inject relevant document chunks if any docs are loaded
-    doc_chunks = sess.doc_store.retrieve(req.message, top_k=4) if sess.doc_store.count() > 0 else []
-    if doc_chunks:
-        rag_context = "\n\n".join(
-            f"[{c['filename']} §{c['chunk_idx']+1}]\n{c['text']}" for c in doc_chunks
+    # Deep RAG: 7-stage pipeline (query intelligence → multi-signal recall →
+    # RRF fusion → rerank → sufficiency check → citation DNA). Only runs if
+    # docs are loaded for this session.
+    rag_result = None
+    if sess.doc_store.count() > 0:
+        history = sess.memory.messages() if hasattr(sess.memory, "messages") else []
+        history_strs = [f"{m.get('role','')}: {m.get('content','')[:200]}" for m in history[-6:]]
+        rag_result = await asyncio.to_thread(
+            run_deep_rag,
+            req.message,
+            sess.doc_store,
+            history_strs,
+            CONFIG.ollama.host,
+            _model_name_for_variant(req.model_variant),
         )
-        enriched = f"[Document context — use this to answer]\n{rag_context}\n\n{enriched}"
+        if rag_result.context_block:
+            enriched = f"[Document context — cite sources as [D1], [D2], etc.]\n{rag_result.context_block}\n\n{enriched}"
 
     async def _event_stream() -> AsyncIterator[str]:
         # Send session_id first
         yield f"data: {json.dumps({'type': 'session', 'session_id': sess.id})}\n\n"
-        if doc_chunks:
-            sources = list({c['filename'] for c in doc_chunks})
-            yield f"data: {json.dumps({'type': 'rag', 'sources': sources})}\n\n"
+        if rag_result and rag_result.sources:
+            yield f"data: {json.dumps({'type': 'rag', 'sources': rag_result.sources, 'confidence': rag_result.sufficiency_confidence, 'rounds': rag_result.retrieval_rounds, 'contradictions': rag_result.contradictions})}\n\n"
 
         full = ""
         tool_names: list[str] = []
