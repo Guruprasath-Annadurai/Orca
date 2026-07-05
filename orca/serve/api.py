@@ -662,6 +662,15 @@ async def terms_of_service():
     return PlainTextResponse(path.read_text(), media_type="text/markdown")
 
 
+@app.get("/legal/ai-policy", response_class=PlainTextResponse)
+async def ai_policy():
+    """AI Policy & Risk Register — the policy Orca's technical safety controls actually enforce."""
+    path = LEGAL_DIR / "AI_POLICY.md"
+    if not path.exists():
+        return PlainTextResponse("AI policy document not found.", status_code=404)
+    return PlainTextResponse(path.read_text(), media_type="text/markdown")
+
+
 @app.get("/api/license")
 async def license_status():
     """Return current license tier and feature set for the web UI."""
