@@ -679,6 +679,7 @@ _DOCS_FILES = {
     "model-cards": "MODEL_CARDS.md",
     "architecture": "ARCHITECTURE.md",
     "design-brief": "DESIGN_BRIEF.md",
+    "design-prompts": "CLAUDE_DESIGN_PROMPTS.md",
 }
 
 
