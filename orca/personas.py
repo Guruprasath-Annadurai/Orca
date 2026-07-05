@@ -18,6 +18,7 @@ orca/train/redteam.py reports before trusting a persona's claims about itself.
 from __future__ import annotations
 
 from orca.character import TOOL_INSTRUCTIONS
+from orca.governance.model_cards import check_persona_claim_allowed
 
 GENESIS_IDENTITY = """\
 You are Orca Genesis — the first-generation foundation intelligence of the Orca AI ecosystem.
@@ -122,6 +123,52 @@ _PERSONA_BY_VARIANT = {
     "ultra": AETERNUM_IDENTITY,
 }
 
+# Citation discipline, mechanism half 2 of 2 (half 1 is the mechanical
+# check_citations() call in orca/serve/api.py's /api/stream handler, which
+# only works when RAG document context exists). When there is NO retrieval
+# corpus to check against, there is no automated way to verify a factual
+# claim came from real training data vs a hallucination — the only lever is
+# telling the model to flag it, which is weaker by necessity, not by choice.
+_CITATION_DISCIPLINE_BLOCK = """
+CITATION DISCIPLINE:
+When document context is provided in this conversation, cite it inline as
+[D1], [D2], etc. — every factual claim traceable to a source should reference one.
+When NO document context is provided and you're answering from your own training
+data, explicitly say so for any specific factual claim (a date, a statistic, a
+named source, a technical spec) — e.g. "based on my training data, not independently
+verified" — rather than stating it with unearned confidence.
+"""
+
+# The specific overclaiming phrase per persona, and what it gets demoted to
+# when orca.governance.model_cards.check_persona_claim_allowed() says the
+# eval/red-team numbers don't back it up yet. This is the actual enforcement
+# mechanism — a system prompt telling itself "never overclaim" doesn't stop
+# the prompt ITSELF from overclaiming; something outside the prompt has to
+# check the evidence and edit the prompt accordingly.
+_CLAIM_PHRASES = {
+    "nano": (
+        "the first-generation foundation intelligence of the Orca AI ecosystem",
+        "an early-generation Orca model still building toward its accuracy and safety targets",
+    ),
+    "core": (
+        "the professional reasoning intelligence of the Orca ecosystem",
+        "a developing reasoning model still building toward its accuracy and safety targets",
+    ),
+    "ultra": (
+        "the flagship intelligence of the Orca ecosystem",
+        "a developing Orca model NOT YET VERIFIED at flagship-tier accuracy or safety",
+    ),
+}
+
+_CHIEF_SCIENTIST_LINE = (
+    "Feel like a chief scientist, chief engineer, strategist, and educator — while staying\n"
+    "transparent about limitations."
+)
+_CHIEF_SCIENTIST_DEMOTED = (
+    "Aim toward chief-scientist-level synthesis as a goal, but be candid that current eval\n"
+    "scores don't yet confirm you consistently reach it — see the disclaimer above."
+)
+
 
 def get_persona_system(variant: str | None) -> str:
     """
@@ -129,9 +176,35 @@ def get_persona_system(variant: str | None) -> str:
     Falls back to Novus (core) for an unrecognized variant — the "default"
     tier, matching CONFIG.ollama.model_core being the fallback model elsewhere.
 
+    Runtime-gated: if this variant's latest eval + red-team numbers don't
+    clear its PERSONA_CLAIM_THRESHOLDS (orca/governance/model_cards.py), the
+    grandiose self-description is swapped for a demoted, honest one and an
+    explicit disclaimer citing the actual shortfall is injected — not a
+    documentation note, an actual edit to what the model is told to say
+    about itself.
+
     TOOL_INSTRUCTIONS (orca/character.py) is a static block, no placeholders —
     the {tools} substitution belongs to a different string (agent.py's
     PLANNER_SYSTEM, used internally by AgentLoop._plan()), not this one.
     """
-    identity = _PERSONA_BY_VARIANT.get(variant or "core", NOVUS_IDENTITY)
-    return f"{identity}\n{TOOL_INSTRUCTIONS}"
+    key = variant if variant in _PERSONA_BY_VARIANT else "core"
+    identity = _PERSONA_BY_VARIANT[key]
+
+    approved, reason = check_persona_claim_allowed(key)
+
+    if not approved:
+        approved_phrase, demoted_phrase = _CLAIM_PHRASES[key]
+        identity = identity.replace(approved_phrase, demoted_phrase)
+        if key == "ultra":
+            identity = identity.replace(_CHIEF_SCIENTIST_LINE, _CHIEF_SCIENTIST_DEMOTED)
+
+        disclaimer = (
+            f"\n[SELF-AWARENESS NOTICE — auto-injected, not editable by conversation]\n"
+            f"Your current eval/red-team numbers do not yet clear this tier's verified-claim "
+            f"threshold: {reason}. Do not describe yourself as flagship-tier, chief-scientist-tier, "
+            f"or state-of-the-art to the user. If asked how capable you are, say plainly that you "
+            f"are a model still being validated and that your outputs deserve extra scrutiny.\n"
+        )
+        identity = identity + disclaimer
+
+    return f"{identity}\n{_CITATION_DISCIPLINE_BLOCK}\n{TOOL_INSTRUCTIONS}"

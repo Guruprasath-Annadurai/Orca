@@ -50,6 +50,7 @@ from orca.docs import (
     chunk_text, DocStore, register_doc, unregister_doc, list_docs,
     run_deep_rag,
 )
+from orca.docs.citation_check import check_citations
 from orca.brain.explainability import ExplainStore, build_from_rag_result
 from orca.serve import session_store, ratelimit
 from orca.code import run_code
@@ -376,6 +377,17 @@ async def stream_chat(
         if user:
             increment_usage(user.id, "message")
 
+        # Citation compliance: mechanical check, not just a prompt instruction.
+        # If document context was available and the response cited zero
+        # sources, that's a real governance signal — logged for visibility
+        # and surfaced to the frontend so it can flag the answer, not silently
+        # trusted just because the system prompt said to cite.
+        context_block = rag_result.context_block if rag_result else ""
+        citation_report = check_citations(full, context_block)
+        if citation_report["had_context"] and not citation_report["compliant"]:
+            audit.log("citation_compliance_failed", user_id=user.id if user else None,
+                      detail={"message_id": message_id, "note": citation_report["note"]})
+
         audit.log("stream_chat", user_id=user.id if user else None,
                   detail={"model": sess.model_variant, "tools": tool_names})
 
@@ -385,7 +397,7 @@ async def stream_chat(
         explain_record = build_from_rag_result(message_id, rag_result, plan_action, tool_names)
         sess.explain_store.add(explain_record)
 
-        yield f"data: {json.dumps({'type': 'done', 'tools': tool_names, 'message_id': message_id})}\n\n"
+        yield f"data: {json.dumps({'type': 'done', 'tools': tool_names, 'message_id': message_id, 'citation_compliance': citation_report})}\n\n"
 
     return StreamingResponse(
         _event_stream(),

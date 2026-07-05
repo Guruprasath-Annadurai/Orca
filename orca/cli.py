@@ -978,6 +978,48 @@ def train_cards_list():
     console.print(table)
 
 
+@train_app.command("persona-eval")
+def train_persona_eval(
+    model:   str = typer.Option(None, "--model", "-m", help="Ollama model name to test"),
+    variant: str = typer.Option(None, "--variant", "-v", help="nano | core | ultra — which persona's eval set to run"),
+    host:    str = typer.Option("http://localhost:11434", "--host"),
+):
+    """Run the persona-specific eval set — Genesis (nano), Novus (core), or Aeternum (ultra).
+
+    Each persona is graded against ITS OWN claimed strength, not one shared
+    benchmark: Genesis on simplicity/honesty-under-uncertainty, Novus on
+    structured reasoning depth, Aeternum on cross-domain synthesis.
+
+    Example:
+      orca train persona-eval --model orca-core --variant core
+    """
+    from orca.train.persona_eval import PersonaEvaluator
+
+    if not model or not variant:
+        console.print("[red]Specify both: orca train persona-eval --model orca-core --variant core[/red]")
+        raise typer.Exit(1)
+    if variant not in ("nano", "core", "ultra"):
+        console.print("[red]--variant must be one of: nano, core, ultra[/red]")
+        raise typer.Exit(1)
+
+    persona_names = {"nano": "Genesis", "core": "Novus", "ultra": "Aeternum"}
+    console.print(f"\n[bold cyan]◈ Persona Eval — {persona_names[variant]} ({model})[/bold cyan]\n")
+
+    ev = PersonaEvaluator(model, ollama_host=host, on_log=lambda m: console.print(f"  [dim]{m}[/dim]"))
+    result = ev.full_report(variant)
+
+    score = result["score"]
+    color = "green" if score >= 70 else "yellow" if score >= 40 else "red"
+    console.print()
+    console.print(Panel(
+        f"[bold]Persona:[/bold]  {persona_names[variant]}\n"
+        f"[bold]Score:[/bold]    [{color} bold]{score}/100[/{color} bold]  "
+        f"({result['passed']}/{result['total']} probes passed)",
+        title="[bold]◈ Persona Eval Report[/bold]",
+        border_style=color,
+    ))
+
+
 @train_app.command("compare")
 def train_compare(
     model_a: str = typer.Argument(..., help="First Ollama model name"),
