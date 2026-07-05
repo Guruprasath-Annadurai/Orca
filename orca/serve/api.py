@@ -678,6 +678,7 @@ _DOCS_FILES = {
     "api-reference": "API_REFERENCE.md",
     "model-cards": "MODEL_CARDS.md",
     "architecture": "ARCHITECTURE.md",
+    "design-brief": "DESIGN_BRIEF.md",
 }
 
 
