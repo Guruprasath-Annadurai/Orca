@@ -867,6 +867,62 @@ def train_eval(
         console.print(f"[green bold]✓ CI PASS — score {score} ≥ threshold {threshold}[/green bold]")
 
 
+@train_app.command("regression")
+def train_regression(
+    model: str = typer.Option(None, "--model", "-m", help="Ollama model name to check"),
+    max_regressions: int = typer.Option(0, "--max-regressions", help="Fail if more than this many prompts regressed (default: 0 — any regression fails)"),
+    ci: bool = typer.Option(False, "--ci", help="CI mode: exit 1 on regression"),
+):
+    """Compare the two most recent eval runs for a model — did anything that used to pass get worse?
+
+    Requires at least 2 eval history entries for the model (run `orca train eval` twice).
+
+    Example:
+      orca train eval --ollama orca-core   # run 1 (baseline)
+      ... fine-tune, redeploy ...
+      orca train eval --ollama orca-core   # run 2 (current)
+      orca train regression --model orca-core --ci
+    """
+    from orca.train.regression import check_regression
+    from rich.table import Table
+
+    if not model:
+        console.print("[red]Specify a model: orca train regression --model orca-core[/red]")
+        raise typer.Exit(1)
+
+    passed, report = check_regression(model, max_allowed_regressions=max_regressions)
+
+    if report.get("status") == "no_baseline":
+        console.print(f"[yellow]{report['note']}[/yellow]")
+        return
+
+    console.print(f"\n[bold cyan]◈ Regression Check — {model}[/bold cyan]")
+    console.print(f"  [dim]baseline:[/dim] {report['baseline_timestamp']}")
+    console.print(f"  [dim]current:[/dim]  {report['current_timestamp']}\n")
+
+    color = "green" if passed else "red"
+    console.print(Panel(
+        f"[bold]Overall score delta:[/bold] {report['overall_score_delta']:+.1f}\n"
+        f"[bold]Accuracy delta:[/bold]      {report['accuracy_delta']:+.3f}\n"
+        f"[bold]Style delta:[/bold]         {report['style_delta']:+.2f}\n"
+        f"[bold]Regressions:[/bold]         {report['regression_count']}\n"
+        f"[bold]Improvements:[/bold]        {report['improvement_count']}",
+        title="[bold]◈ Regression Report[/bold]",
+        border_style=color,
+    ))
+
+    if report["regressions"]:
+        console.print("\n[red bold]Regressed prompts:[/red bold]")
+        for r in report["regressions"]:
+            console.print(f"  [dim]•[/dim] {r['prompt']}: {r['baseline_score']} → {r['current_score']} ({r['delta']:+.2f})")
+
+    if ci:
+        if not passed:
+            console.print(f"\n[red bold]✗ CI FAIL — {report['regression_count']} regression(s), max allowed {max_regressions}[/red bold]")
+            raise typer.Exit(1)
+        console.print(f"\n[green bold]✓ CI PASS — {report['regression_count']} regression(s) within threshold[/green bold]")
+
+
 @train_app.command("redteam")
 def train_redteam(
     model:     str  = typer.Option(None,  "--model", "-m", help="Ollama model name to test"),

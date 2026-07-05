@@ -69,6 +69,15 @@ jobs:
             --ci \
             --threshold "${{ github.event.inputs.threshold || '40' }}"
 
+      - name: Check for eval regressions vs previous run
+        run: |
+          orca train regression \
+            --model "${{ steps.model.outputs.model }}" \
+            --ci
+        # Self-hosted runner (see runs-on above) persists ~/.orca/training/eval/history
+        # across runs, which is what makes this comparison meaningful — a fresh
+        # ephemeral runner would have no prior history to compare against.
+
       - name: Run red-team safety suite (CI mode)
         run: |
           orca train redteam \
