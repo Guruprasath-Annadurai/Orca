@@ -327,7 +327,21 @@ class OllamaEvaluator:
         out = EVAL_DIR / f"eval_{self.model.replace('/', '-')}.json"
         with open(out, "w") as f:
             json.dump(report, f, indent=2)
+
+        # Regression testing needs history, not just "latest" — the file
+        # above gets overwritten every run, so orca/train/regression.py
+        # can't diff anything from it alone. Archive a timestamped copy
+        # alongside it; existing readers of eval_{model}.json (model_cards.py)
+        # are untouched since that file's path/format doesn't change.
+        history_dir = EVAL_DIR / "history"
+        history_dir.mkdir(parents=True, exist_ok=True)
+        ts_safe = report["timestamp"].replace(":", "-")
+        history_path = history_dir / f"{self.model.replace('/', '-')}_{ts_safe}.json"
+        with open(history_path, "w") as f:
+            json.dump(report, f, indent=2)
+
         self.log(f"\n[eval] report saved: {out}")
+        self.log(f"[eval] history archived: {history_path}")
         self.log(f"[eval] overall score: {overall}/100")
         return report
 

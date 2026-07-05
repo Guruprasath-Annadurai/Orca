@@ -5,7 +5,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-ORCA_HOME = Path(os.environ.get("ORCA_HOME", Path.home() / ".orca"))
+# .expanduser() is required here — python-dotenv (and any shell config a
+# user copies verbatim from .env.example) can set ORCA_HOME to a literal
+# unexpanded "~/.orca" string. Path() does NOT expand "~" on its own; only
+# .expanduser() does. Without this, ORCA_HOME silently resolves to a
+# relative "~/.orca" directory created under whatever the current working
+# directory happens to be — a real bug found in this project's own testing,
+# not a hypothetical: it silently redirected the auth DB, audit log, memory,
+# and every other ORCA_HOME-relative store to the wrong location.
+ORCA_HOME = Path(os.environ.get("ORCA_HOME", str(Path.home() / ".orca"))).expanduser()
 ORCA_HOME.mkdir(parents=True, exist_ok=True)
 
 MEMORY_DIR = ORCA_HOME / "memory"
