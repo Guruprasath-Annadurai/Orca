@@ -87,6 +87,40 @@ def get_stripe_customer_id(user_id: str) -> Optional[str]:
     return row["stripe_customer_id"] if row else None
 
 
+# ── 2FA / TOTP ─────────────────────────────────────────────────────────────────
+
+def set_pending_totp_secret(user_id: str, secret: str) -> None:
+    """
+    Stores a secret WITHOUT enabling 2FA — the user must prove they can
+    generate a valid code (via enable_totp) before it takes effect. Prevents
+    a half-finished setup from silently requiring 2FA on next login with no
+    way for the user to have actually saved the secret in their app.
+    """
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET totp_secret=?, totp_enabled=0 WHERE id=?", (secret, user_id))
+
+
+def enable_totp(user_id: str) -> None:
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET totp_enabled=1 WHERE id=?", (user_id,))
+
+
+def disable_totp(user_id: str) -> None:
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET totp_secret=NULL, totp_enabled=0 WHERE id=?", (user_id,))
+
+
+def get_totp_state(user_id: str) -> dict:
+    """Returns {'secret': str|None, 'enabled': bool} — internal detail, not on the User dataclass."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT totp_secret, totp_enabled FROM users WHERE id=?", (user_id,)
+        ).fetchone()
+    if not row:
+        return {"secret": None, "enabled": False}
+    return {"secret": row["totp_secret"], "enabled": bool(row["totp_enabled"])}
+
+
 def set_user_role(user_id: str, role: str) -> None:
     with get_conn() as conn:
         conn.execute("UPDATE users SET role=? WHERE id=?", (role, user_id))

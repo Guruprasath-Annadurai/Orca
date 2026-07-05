@@ -45,6 +45,16 @@ def make_reset_token(user_id: str, email: str) -> str:
     return _encode({"sub": user_id, "email": email, "type": "reset",  "exp": int(time.time()) + 3600})
 
 
+def make_2fa_pending_token(user_id: str, email: str) -> str:
+    """
+    Issued after password check passes but BEFORE the TOTP code is verified —
+    proves "this request already knows the password" without granting a real
+    session token. Short expiry (5 min) since it's meant to be exchanged
+    immediately for the real token via /api/auth/2fa/verify-login.
+    """
+    return _encode({"sub": user_id, "email": email, "type": "2fa_pending", "exp": int(time.time()) + 300})
+
+
 def verify_token(token: str, expected_type: str) -> Optional[dict]:
     """Returns payload dict if valid and type matches, else None."""
     payload = _decode(token)

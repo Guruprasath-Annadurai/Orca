@@ -41,7 +41,9 @@ CREATE TABLE IF NOT EXISTS users (
     role                TEXT NOT NULL DEFAULT 'member',
     created_at          TEXT NOT NULL,
     verified            INTEGER NOT NULL DEFAULT 0,
-    stripe_customer_id  TEXT
+    stripe_customer_id  TEXT,
+    totp_secret         TEXT,
+    totp_enabled        INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS usage_daily (
@@ -66,7 +68,9 @@ CREATE TABLE IF NOT EXISTS users (
     role                TEXT NOT NULL DEFAULT 'member',
     created_at          TEXT NOT NULL,
     verified            INTEGER NOT NULL DEFAULT 0,
-    stripe_customer_id  TEXT
+    stripe_customer_id  TEXT,
+    totp_secret         TEXT,
+    totp_enabled        INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS ix_users_stripe_customer ON users(stripe_customer_id);
 
@@ -205,6 +209,8 @@ def init_db() -> None:
             # no try/except dance needed like the SQLite branch below.
             conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT")
             conn.execute("CREATE INDEX IF NOT EXISTS ix_users_stripe_customer ON users(stripe_customer_id)")
+            conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT")
+            conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled INTEGER NOT NULL DEFAULT 0")
         return
 
     with get_conn() as conn:
@@ -215,6 +221,8 @@ def init_db() -> None:
         for stmt in [
             "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'member'",
             "ALTER TABLE users ADD COLUMN stripe_customer_id TEXT",
+            "ALTER TABLE users ADD COLUMN totp_secret TEXT",
+            "ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0",
         ]:
             try:
                 conn.execute(stmt)

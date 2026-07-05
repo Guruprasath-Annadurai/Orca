@@ -13,13 +13,22 @@ from orca.auth.store import (
     create_user,
     get_usage_today,
     get_user_by_email,
+    get_user_by_id,
     set_user_tier,
     set_user_role,
     list_users,
+    set_pending_totp_secret,
+    enable_totp,
+    disable_totp,
+    get_totp_state,
 )
 from orca.auth.apikeys import create_key, list_keys, revoke_key
 from orca.auth.rbac import require_permission
-from orca.auth.tokens import make_verification_token, make_reset_token, verify_token as verify_auth_token
+from orca.auth.tokens import (
+    make_verification_token, make_reset_token, make_2fa_pending_token,
+    verify_token as verify_auth_token,
+)
+from orca.auth.totp import generate_totp_secret, verify_totp, provisioning_uri
 from orca.auth.email import send_verification, send_password_reset, is_configured as email_configured
 from orca.serve import ratelimit
 
@@ -81,7 +90,105 @@ async def login(req: LoginRequest, request: Request):
     user = authenticate(req.email, req.password)
     if not user:
         raise HTTPException(401, "Invalid email or password")
+
+    totp_state = get_totp_state(user.id)
+    if totp_state["enabled"]:
+        # Password checked out, but 2FA is on — don't hand out a real session
+        # token yet. pending_token proves "already knows the password" without
+        # granting access; the client exchanges it for a real token at
+        # /api/auth/2fa/verify-login once it has the TOTP code.
+        pending_token = make_2fa_pending_token(user.id, user.email)
+        return {"requires_2fa": True, "pending_token": pending_token}
+
     return _make_response(user)
+
+
+class TwoFAVerifyLoginRequest(BaseModel):
+    pending_token: str
+    code: str
+
+
+@router.post("/2fa/verify-login")
+async def verify_login_2fa(req: TwoFAVerifyLoginRequest, request: Request):
+    """Exchanges a pending_token (from /login, after password check) + a TOTP code for a real session token."""
+    ratelimit.enforce(request, ratelimit.AUTH_LOGIN)
+    payload = verify_auth_token(req.pending_token, "2fa_pending")
+    if not payload:
+        raise HTTPException(401, "2FA session expired or invalid — log in again.")
+
+    user = get_user_by_id(payload["sub"])
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    totp_state = get_totp_state(user.id)
+    if not totp_state["enabled"] or not totp_state["secret"]:
+        raise HTTPException(400, "2FA is not enabled on this account.")
+
+    if not verify_totp(totp_state["secret"], req.code):
+        raise HTTPException(401, "Invalid or expired code.")
+
+    return _make_response(user)
+
+
+@router.post("/2fa/setup")
+async def setup_2fa(user: User = Depends(get_current_user)):
+    """
+    Generates a new TOTP secret WITHOUT enabling 2FA yet — the user must
+    scan/enter it into their authenticator app and prove a valid code via
+    /2fa/enable before it takes effect. Overwrites any previous pending
+    (not-yet-enabled) secret; does NOT touch an already-enabled 2FA setup —
+    call /2fa/disable first if you want to redo an active setup.
+    """
+    existing = get_totp_state(user.id)
+    if existing["enabled"]:
+        raise HTTPException(400, "2FA is already enabled. Disable it first to set up a new device.")
+
+    secret = generate_totp_secret()
+    set_pending_totp_secret(user.id, secret)
+    uri = provisioning_uri(secret, user.email)
+    return {"secret": secret, "provisioning_uri": uri}
+
+
+class TwoFAEnableRequest(BaseModel):
+    code: str
+
+
+@router.post("/2fa/enable")
+async def enable_2fa(req: TwoFAEnableRequest, user: User = Depends(get_current_user)):
+    """Finalizes 2FA — requires a valid code from the secret issued by /2fa/setup, proving the app is actually working."""
+    state = get_totp_state(user.id)
+    if not state["secret"]:
+        raise HTTPException(400, "No pending 2FA setup found. Call /2fa/setup first.")
+    if state["enabled"]:
+        raise HTTPException(400, "2FA is already enabled.")
+
+    if not verify_totp(state["secret"], req.code):
+        raise HTTPException(401, "Invalid code — check your authenticator app and try again.")
+
+    enable_totp(user.id)
+    return {"enabled": True}
+
+
+class TwoFADisableRequest(BaseModel):
+    code: str
+
+
+@router.post("/2fa/disable")
+async def disable_2fa(req: TwoFADisableRequest, user: User = Depends(get_current_user)):
+    """
+    Requires a valid current TOTP code to disable — not just an active
+    session. Without this, anyone who hijacks a logged-in session (XSS,
+    stolen token, etc.) could silently turn off 2FA and lock out the real
+    owner's recovery path.
+    """
+    state = get_totp_state(user.id)
+    if not state["enabled"]:
+        raise HTTPException(400, "2FA is not enabled on this account.")
+    if not verify_totp(state["secret"], req.code):
+        raise HTTPException(401, "Invalid code.")
+
+    disable_totp(user.id)
+    return {"enabled": False}
 
 
 @router.get("/me")
