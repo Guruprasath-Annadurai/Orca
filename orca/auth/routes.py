@@ -1,7 +1,7 @@
 """Auth API routes — signup, login, me, logout."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from orca.auth.crypto import create_token
@@ -21,6 +21,7 @@ from orca.auth.apikeys import create_key, list_keys, revoke_key
 from orca.auth.rbac import require_permission
 from orca.auth.tokens import make_verification_token, make_reset_token, verify_token as verify_auth_token
 from orca.auth.email import send_verification, send_password_reset, is_configured as email_configured
+from orca.serve import ratelimit
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -55,7 +56,8 @@ def _make_response(user: User) -> dict:
 
 
 @router.post("/signup")
-async def signup(req: SignupRequest):
+async def signup(req: SignupRequest, request: Request):
+    ratelimit.enforce(request, ratelimit.AUTH_SIGNUP)
     if len(req.password) < 8:
         raise HTTPException(400, "Password must be at least 8 characters")
     if "@" not in req.email or "." not in req.email.split("@")[-1]:
@@ -74,7 +76,8 @@ async def signup(req: SignupRequest):
 
 
 @router.post("/login")
-async def login(req: LoginRequest):
+async def login(req: LoginRequest, request: Request):
+    ratelimit.enforce(request, ratelimit.AUTH_LOGIN)
     user = authenticate(req.email, req.password)
     if not user:
         raise HTTPException(401, "Invalid email or password")
@@ -140,7 +143,8 @@ justify-content:center;height:100vh;margin:0}div{text-align:center}</style></hea
 
 
 @router.post("/forgot-password")
-async def forgot_password(req: ForgotRequest):
+async def forgot_password(req: ForgotRequest, request: Request):
+    ratelimit.enforce(request, ratelimit.AUTH_FORGOT_PW)
     user = get_user_by_email(req.email)
     if user:
         token = make_reset_token(user.id, user.email)

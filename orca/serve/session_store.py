@@ -50,6 +50,12 @@ def _client():
     return _redis_client
 
 
+def get_client():
+    """Public accessor — other modules (e.g. ratelimit.py) share this same
+    Redis connection rather than opening their own."""
+    return _client()
+
+
 def _key(session_id: str) -> str:
     return f"orca:session:{session_id}"
 

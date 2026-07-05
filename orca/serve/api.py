@@ -50,7 +50,7 @@ from orca.docs import (
     run_deep_rag,
 )
 from orca.brain.explainability import ExplainStore, build_from_rag_result
-from orca.serve import session_store
+from orca.serve import session_store, ratelimit
 from orca.code import run_code
 
 _START_TIME = time.time()
@@ -251,8 +251,15 @@ async def status():
 @app.post("/api/chat")
 async def chat(
     req: ChatRequest,
+    request: Request,
     user: User | None = Depends(get_current_user_optional),
 ):
+    # IP-based floor applies regardless of auth status — the per-user tier
+    # quota below only ever ran `if user:`, leaving anonymous requests with
+    # zero limit. This closes that gap; authenticated users still also get
+    # their tier quota checked right after.
+    ratelimit.enforce(request, ratelimit.CHAT_ANY, extra_key="chat")
+
     if user:
         allowed, used, limit = check_quota(user.id, user.tier, "message")
         if not allowed:
@@ -292,8 +299,11 @@ async def chat(
 @app.post("/api/stream")
 async def stream_chat(
     req: ChatRequest,
+    request: Request,
     user: User | None = Depends(get_current_user_optional),
 ):
+    ratelimit.enforce(request, ratelimit.CHAT_ANY, extra_key="stream")
+
     if user:
         allowed, used, limit = check_quota(user.id, user.tier, "message")
         if not allowed:
@@ -631,11 +641,13 @@ async def ultra_run(req: UltraRequest):
 
 @app.post("/api/docs/upload")
 async def upload_doc(
+    request: Request,
     file: UploadFile = File(...),
     session_id: str | None = None,
     user: User | None = Depends(get_current_user_optional),
 ):
     """Upload a document for RAG — extract, chunk, embed, and store."""
+    ratelimit.enforce(request, ratelimit.DOC_UPLOAD, extra_key="doc_upload")
     if file.filename and Path(file.filename).suffix.lower() not in SUPPORTED_EXTENSIONS:
         return JSONResponse(
             {"error": f"Unsupported file type. Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"},
@@ -712,9 +724,11 @@ class CodeRunRequest(BaseModel):
 @app.post("/api/code/run")
 async def code_run(
     req: CodeRunRequest,
+    request: Request,
     user: User | None = Depends(get_current_user_optional),
 ):
     """Execute Python code in a sandboxed subprocess. Returns stdout/stderr/error."""
+    ratelimit.enforce(request, ratelimit.CODE_RUN, extra_key="code_run")
     if req.language != "python":
         return JSONResponse({"error": f"Language '{req.language}' not supported. Only Python is available."}, status_code=400)
 
