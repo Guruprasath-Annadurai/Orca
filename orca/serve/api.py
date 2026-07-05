@@ -50,6 +50,7 @@ from orca.docs import (
     run_deep_rag,
 )
 from orca.brain.explainability import ExplainStore, build_from_rag_result
+from orca.serve import session_store
 from orca.code import run_code
 
 _START_TIME = time.time()
@@ -82,18 +83,40 @@ def _model_name_for_variant(variant: str | None) -> str:
 class _Session:
     def __init__(self, session_id: str, model_variant: str | None = None):
         self.id = session_id
+
+        # Cross-instance continuity: if Redis has this session's state (from
+        # this or another API instance), restore the exact conversation
+        # history instead of starting cold. An explicit model_variant from
+        # the caller wins over the persisted one (user actively switching
+        # models mid-conversation should be respected); Redis only fills in
+        # when the caller didn't specify (session_id known, variant omitted).
+        redis_state = session_store.load_session_state(session_id)
+        restored_history = None
+        if redis_state:
+            model_variant = model_variant or redis_state.get("model_variant")
+            restored_history = redis_state.get("history")
+
         self.model_variant = model_variant or "core"
         self.memory = MemoryEngine(session_id=session_id)
         brain = get_brain(_model_name_for_variant(model_variant))
         self.ctx = ContextManager(brain)
         tools = build_registry(memory_engine=self.memory)
         self.agent = AgentLoop(brain=brain, tools=tools, session_id=session_id)
-        prior = self.memory.load_prior_context()
-        if prior:
-            self.agent.load_history([
-                {"role": "user", "content": f"[Prior context]\n{prior}"},
-                {"role": "assistant", "content": "Context loaded."},
-            ])
+
+        if restored_history:
+            self.agent.load_history(restored_history)
+        else:
+            # Fallback: no exact turn history available (fresh session, or
+            # Redis disabled/empty) — reconstruct rough context from the
+            # long-term summary store instead. Less precise than Redis's
+            # exact history, only used when that's unavailable.
+            prior = self.memory.load_prior_context()
+            if prior:
+                self.agent.load_history([
+                    {"role": "user", "content": f"[Prior context]\n{prior}"},
+                    {"role": "assistant", "content": "Context loaded."},
+                ])
+
         self.brain = brain
         self.doc_store = DocStore(session_id=session_id, ollama_host=CONFIG.ollama.host)
         self.explain_store = ExplainStore()
@@ -101,6 +124,10 @@ class _Session:
 
     def touch(self):
         self.last_active = time.time()
+
+    def persist_to_redis(self):
+        """Save current conversation history so any instance can pick this session back up."""
+        session_store.save_session_state(self.id, self.model_variant, self.agent.get_history())
 
 
 _sessions: dict[str, _Session] = {}
@@ -111,6 +138,7 @@ def _get_session(session_id: str | None, model_variant: str | None = None) -> _S
     if sid not in _sessions:
         _sessions[sid] = _Session(sid, model_variant)
     _sessions[sid].touch()
+    session_store.touch_session(sid)  # refresh Redis TTL — no-op if Redis disabled
     # Evict idle sessions (>2h) to save memory
     now = time.time()
     stale = [k for k, v in _sessions.items() if now - v.last_active > 7200 and k != sid]
@@ -216,6 +244,7 @@ async def status():
         "total_sessions": len(sessions),
         "training_examples": raw_count,
         "version": "1.0.0",
+        "redis": {"enabled": session_store.enabled(), "reachable": session_store.ping()},
     }
 
 
@@ -247,6 +276,7 @@ async def chat(
     sess.memory.add_turn("user", req.message)
     sess.memory.add_turn("assistant", final)
     sess.memory.commit_to_long_term(f"Q: {req.message[:200]}\nA: {final[:500]}")
+    sess.persist_to_redis()
 
     audit.log("chat", user_id=user.id if user else None,
               detail={"model": sess.model_variant, "tools": [tc.tool for tc in trace.tool_calls]})
@@ -329,6 +359,7 @@ async def stream_chat(
         sess.memory.add_turn("user", req.message)
         sess.memory.add_turn("assistant", full)
         sess.memory.commit_to_long_term(f"Q: {req.message[:200]}\nA: {full[:500]}")
+        sess.persist_to_redis()
         if user:
             increment_usage(user.id, "message")
 
@@ -580,6 +611,10 @@ async def ultra_run(req: UltraRequest):
         sess.memory.commit_to_long_term(
             f"[Ultra] Q: {req.task[:200]}\nA: {pipeline.final_output[:500]}"
         )
+        # Note: OrcaUltra doesn't run through AgentLoop, so this turn won't
+        # appear in agent.get_history() — persist_to_redis() still preserves
+        # model_variant continuity even though the turn itself isn't captured.
+        sess.persist_to_redis()
 
         yield f"data: {json.dumps({'type': 'done', 'grade': pipeline.grade, 'iterations': pipeline.iterations})}\n\n"
 

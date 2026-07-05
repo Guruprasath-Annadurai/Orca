@@ -183,6 +183,9 @@ class AgentLoop:
     def load_history(self, messages: list[dict]) -> None:
         self._history = list(messages)
 
+    def get_history(self) -> list[dict]:
+        return list(self._history)
+
     # ── Internal ──────────────────────────────────────────────────────────────
 
     def _plan(self, user_input: str, sys_prompt: str) -> dict:

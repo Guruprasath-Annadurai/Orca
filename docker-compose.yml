@@ -40,6 +40,24 @@ services:
       timeout: 5s
       retries: 5
 
+  # Optional — only needed for cross-instance session continuity (a user's
+  # conversation history surviving a process restart or landing on a
+  # different API replica). Single-instance/local installs work fine without
+  # it — sessions just live in that one process's memory, exactly as today.
+  redis:
+    image: redis:7-alpine
+    container_name: atheris-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   atheris:
     build: .
     container_name: atheris-server
@@ -56,12 +74,16 @@ services:
       # Uncomment to switch from local SQLite to Postgres (needed for
       # multi-instance / horizontally-scaled deployments):
       # ORCA_DATABASE_URL: postgresql://orca:${ORCA_DB_PASSWORD:-change-me-in-production}@postgres:5432/orca
+      # Uncomment for cross-instance session continuity:
+      # ORCA_REDIS_URL: redis://redis:6379/0
     depends_on:
       - ollama
       # - postgres  # uncomment alongside ORCA_DATABASE_URL above
+      # - redis     # uncomment alongside ORCA_REDIS_URL above
     restart: unless-stopped
 
 volumes:
   ollama_data:
   atheris_data:
   postgres_data:
+  redis_data:

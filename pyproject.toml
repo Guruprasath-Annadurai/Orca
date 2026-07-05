@@ -73,6 +73,9 @@ train  = [
 postgres = [
     "psycopg[binary]>=3.1",
 ]
+redis = [
+    "redis>=5.0.0",
+]
 
 [project.scripts]
 orca = "orca.cli:app"
