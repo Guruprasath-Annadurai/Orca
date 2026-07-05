@@ -18,6 +18,28 @@ services:
     #           count: all
     #           capabilities: [gpu]
 
+  # Optional — only needed once you're running multiple `atheris` API
+  # instances behind a load balancer. A single local install is fine on
+  # SQLite (the default, no ORCA_DATABASE_URL needed). Uncomment this service
+  # plus the ORCA_DATABASE_URL line below when moving to production scale.
+  postgres:
+    image: postgres:17-alpine
+    container_name: atheris-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: orca
+      POSTGRES_PASSWORD: ${ORCA_DB_PASSWORD:-change-me-in-production}
+      POSTGRES_DB: orca
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orca"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   atheris:
     build: .
     container_name: atheris-server
@@ -31,10 +53,15 @@ services:
       ORCA_NANO_MODEL:  ${ORCA_NANO_MODEL:-qwen2.5:7b}
       ORCA_ULTRA_MODEL: ${ORCA_ULTRA_MODEL:-qwen2.5:14b}
       ORCA_AUTH_SECRET: ${ORCA_AUTH_SECRET:-change-me-in-production}
+      # Uncomment to switch from local SQLite to Postgres (needed for
+      # multi-instance / horizontally-scaled deployments):
+      # ORCA_DATABASE_URL: postgresql://orca:${ORCA_DB_PASSWORD:-change-me-in-production}@postgres:5432/orca
     depends_on:
       - ollama
+      # - postgres  # uncomment alongside ORCA_DATABASE_URL above
     restart: unless-stopped
 
 volumes:
   ollama_data:
   atheris_data:
+  postgres_data:

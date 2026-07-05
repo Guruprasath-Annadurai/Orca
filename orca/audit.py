@@ -26,7 +26,7 @@ import threading
 import time
 import uuid
 
-from orca.auth.db import get_conn
+from orca.auth.db import get_conn, BACKEND
 
 _GENESIS_HASH = "0" * 64
 _chain_lock = threading.Lock()   # serializes hash-chain writes — must be strictly ordered
@@ -59,7 +59,12 @@ def _ensure_table() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS ix_audit_user  ON audit_log(user_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS ix_audit_event ON audit_log(event)")
         conn.execute("CREATE INDEX IF NOT EXISTS ix_audit_ts    ON audit_log(created_at)")
-        _migrate_legacy_schema(conn)
+        if BACKEND == "sqlite":
+            # Postgres installs are always fresh — orca/auth/db.py's schema
+            # already includes seq/prev_hash/entry_hash/signature from the
+            # start, so there's no legacy table to migrate. PRAGMA table_info
+            # (used below) is SQLite-only syntax and would error on Postgres.
+            _migrate_legacy_schema(conn)
         conn.execute("CREATE INDEX IF NOT EXISTS ix_audit_seq   ON audit_log(seq)")
 
 
@@ -155,6 +160,17 @@ def log(
 
         with _chain_lock:
             with get_conn() as conn:
+                if BACKEND == "postgres":
+                    # _chain_lock only serializes writers within THIS process —
+                    # useless once multiple API instances write to the same
+                    # Postgres database. pg_advisory_xact_lock takes a
+                    # cluster-wide lock scoped to this transaction, auto-released
+                    # on commit/rollback (i.e. when the `with get_conn()` block
+                    # exits) — every instance blocks here until the previous
+                    # writer's transaction finishes, keeping seq/prev_hash
+                    # assignment strictly ordered across the whole deployment.
+                    conn.execute("SELECT pg_advisory_xact_lock(hashtext('orca_audit_chain'))")
+
                 last = conn.execute(
                     "SELECT entry_hash, seq FROM audit_log ORDER BY seq DESC LIMIT 1"
                 ).fetchone()

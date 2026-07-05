@@ -11,11 +11,16 @@ import time
 import uuid
 from typing import Optional
 
-from orca.auth.db import get_conn
+from orca.auth.db import get_conn, BACKEND
 
 
 def _ensure_table() -> None:
     with get_conn() as conn:
+        if BACKEND == "postgres":
+            # Same concurrent-CREATE-TABLE race as orca/auth/db.py's init_db() —
+            # serialize schema creation across instances so a simultaneous
+            # multi-instance startup doesn't crash on a catalog UniqueViolation.
+            conn.execute("SELECT pg_advisory_xact_lock(hashtext('orca_apikeys_init'))")
         conn.execute("""
         CREATE TABLE IF NOT EXISTS api_keys (
             id         TEXT PRIMARY KEY,
