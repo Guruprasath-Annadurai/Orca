@@ -51,6 +51,7 @@ from orca.docs import (
     run_deep_rag,
 )
 from orca.docs.citation_check import check_citations
+from orca.docs.pii_redact import redact_pii
 from orca.brain.explainability import ExplainStore, build_from_rag_result
 from orca.serve import session_store, ratelimit
 from orca.serve.moderation import check_input, CRISIS_RESOURCES
@@ -810,6 +811,17 @@ async def upload_doc(
     if not text.strip():
         return JSONResponse({"error": "No text could be extracted from this file."}, status_code=422)
 
+    # PII redaction — scrubs SSNs, emails, phone numbers, and Luhn-valid
+    # credit card numbers BEFORE the document is chunked/embedded into the
+    # persistent vector store. Applies here (uploads), not to live chat
+    # messages — see orca/docs/pii_redact.py docstring for why that scope
+    # boundary is deliberate, not an oversight.
+    text, pii_report = redact_pii(text)
+    if pii_report["total"] > 0:
+        audit.log("doc_pii_redacted", user_id=user.id if user else None,
+                  detail={"filename": filename, **{k: v for k, v in pii_report.items() if k != "total"},
+                          "total_redactions": pii_report["total"]})
+
     doc_id = str(uuid.uuid4())
     chunks = chunk_text(text, doc_id=doc_id, filename=filename)
 
@@ -818,7 +830,8 @@ async def upload_doc(
     register_doc(sess.id, doc_id, filename, chunk_count=stored, size_bytes=len(data))
 
     audit.log("doc_upload", user_id=user.id if user else None,
-              detail={"filename": filename, "chunks": stored, "bytes": len(data)})
+              detail={"filename": filename, "chunks": stored, "bytes": len(data),
+                      "pii_redactions": pii_report["total"]})
 
     return {
         "doc_id": doc_id,
