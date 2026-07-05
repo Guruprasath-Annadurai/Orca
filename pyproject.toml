@@ -58,6 +58,7 @@ all    = [
     "chromadb>=0.5.0",
     "pypdf>=4.0.0", "python-docx>=1.1.0", "pdfminer.six>=20221105",
     "mcp>=1.0.0",
+    "stripe>=7.0.0",
 ]
 train  = [
     "unsloth>=2024.11.0",

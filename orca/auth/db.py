@@ -33,14 +33,15 @@ _PLACEHOLDER_RE = re.compile(r"\?")
 
 _SCHEMA_SQLITE = """
 CREATE TABLE IF NOT EXISTS users (
-    id            TEXT PRIMARY KEY,
-    email         TEXT UNIQUE NOT NULL,
-    name          TEXT NOT NULL DEFAULT '',
-    password_hash TEXT NOT NULL,
-    tier          TEXT NOT NULL DEFAULT 'free',
-    role          TEXT NOT NULL DEFAULT 'member',
-    created_at    TEXT NOT NULL,
-    verified      INTEGER NOT NULL DEFAULT 0
+    id                  TEXT PRIMARY KEY,
+    email               TEXT UNIQUE NOT NULL,
+    name                TEXT NOT NULL DEFAULT '',
+    password_hash       TEXT NOT NULL,
+    tier                TEXT NOT NULL DEFAULT 'free',
+    role                TEXT NOT NULL DEFAULT 'member',
+    created_at          TEXT NOT NULL,
+    verified            INTEGER NOT NULL DEFAULT 0,
+    stripe_customer_id  TEXT
 );
 
 CREATE TABLE IF NOT EXISTS usage_daily (
@@ -58,14 +59,16 @@ CREATE TABLE IF NOT EXISTS usage_daily (
 _SCHEMA_POSTGRES = """
 CREATE TABLE IF NOT EXISTS users (
     id            TEXT PRIMARY KEY,
-    email         TEXT UNIQUE NOT NULL,
-    name          TEXT NOT NULL DEFAULT '',
-    password_hash TEXT NOT NULL,
-    tier          TEXT NOT NULL DEFAULT 'free',
-    role          TEXT NOT NULL DEFAULT 'member',
-    created_at    TEXT NOT NULL,
-    verified      INTEGER NOT NULL DEFAULT 0
+    email               TEXT UNIQUE NOT NULL,
+    name                TEXT NOT NULL DEFAULT '',
+    password_hash       TEXT NOT NULL,
+    tier                TEXT NOT NULL DEFAULT 'free',
+    role                TEXT NOT NULL DEFAULT 'member',
+    created_at          TEXT NOT NULL,
+    verified            INTEGER NOT NULL DEFAULT 0,
+    stripe_customer_id  TEXT
 );
+CREATE INDEX IF NOT EXISTS ix_users_stripe_customer ON users(stripe_customer_id);
 
 CREATE TABLE IF NOT EXISTS usage_daily (
     user_id    TEXT NOT NULL,
@@ -195,14 +198,23 @@ def init_db() -> None:
             # already exists once they get the lock.
             conn.execute("SELECT pg_advisory_xact_lock(hashtext('orca_schema_init'))")
             conn.executescript(_SCHEMA_POSTGRES)
+            # A Postgres deployment created BEFORE a given column existed in
+            # _SCHEMA_POSTGRES needs its own migration too — "fresh installs
+            # get every column" only covers installs created after this line
+            # was added. Postgres supports ADD COLUMN IF NOT EXISTS natively,
+            # no try/except dance needed like the SQLite branch below.
+            conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT")
+            conn.execute("CREATE INDEX IF NOT EXISTS ix_users_stripe_customer ON users(stripe_customer_id)")
         return
 
     with get_conn() as conn:
         conn.executescript(_SCHEMA_SQLITE)
         # Migrations for existing SQLite installs only — a fresh Postgres
-        # schema above already has every column.
+        # schema above already has every column (as of its own creation date —
+        # columns added after that still need the ALTER above).
         for stmt in [
             "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'member'",
+            "ALTER TABLE users ADD COLUMN stripe_customer_id TEXT",
         ]:
             try:
                 conn.execute(stmt)

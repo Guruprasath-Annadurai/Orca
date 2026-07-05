@@ -65,6 +65,28 @@ def set_user_tier(user_id: str, tier: str) -> None:
         conn.execute("UPDATE users SET tier=? WHERE id=?", (tier, user_id))
 
 
+def set_stripe_customer_id(user_id: str, customer_id: str) -> None:
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET stripe_customer_id=? WHERE id=?", (customer_id, user_id))
+
+
+def get_user_by_stripe_customer_id(customer_id: str) -> Optional[User]:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE stripe_customer_id=?", (customer_id,)
+        ).fetchone()
+    return _row_to_user(row)
+
+
+def get_stripe_customer_id(user_id: str) -> Optional[str]:
+    """stripe_customer_id isn't on the User dataclass (billing-internal detail) — fetch directly."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT stripe_customer_id FROM users WHERE id=?", (user_id,)
+        ).fetchone()
+    return row["stripe_customer_id"] if row else None
+
+
 def set_user_role(user_id: str, role: str) -> None:
     with get_conn() as conn:
         conn.execute("UPDATE users SET role=? WHERE id=?", (role, user_id))

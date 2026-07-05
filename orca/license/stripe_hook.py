@@ -67,9 +67,15 @@ def handle_stripe_event(payload: bytes, sig_header: str) -> dict:
     secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
     event  = _verify_signature(payload, sig_header, secret)
 
-    if event["type"] != "checkout.session.completed":
-        return {"status": "ignored", "type": event["type"]}
+    if event["type"] == "checkout.session.completed":
+        return _handle_checkout_completed(event)
+    if event["type"] in ("customer.subscription.deleted", "invoice.payment_failed"):
+        return _handle_subscription_downgrade(event)
 
+    return {"status": "ignored", "type": event["type"]}
+
+
+def _handle_checkout_completed(event: dict) -> dict:
     session  = event["data"]["object"]
     metadata = session.get("metadata") or {}
 
@@ -92,7 +98,27 @@ def handle_stripe_event(payload: bytes, sig_header: str) -> dict:
     else:
         tier, seats, days = _price_to_params(price_id)
 
-    # Generate the license key
+    # ── Upgrade the web account, if this checkout came from a logged-in user ──
+    # client_reference_id is set by POST /api/billing/checkout (orca/serve/api.py)
+    # to the authenticated user's id. Payment Links created directly in the
+    # Stripe dashboard (no app-created Checkout Session) won't have this —
+    # those customers only get the offline license-key flow below, same as
+    # before this fix. Each half is wrapped independently so a failure in one
+    # (e.g. DB unavailable) doesn't block the other from completing.
+    user_id = session.get("client_reference_id") or metadata.get("user_id", "")
+    account_updated = False
+    if user_id:
+        try:
+            from orca.auth.store import set_user_tier, set_stripe_customer_id
+            set_user_tier(user_id, tier)
+            customer_id = session.get("customer")
+            if customer_id:
+                set_stripe_customer_id(user_id, customer_id)
+            account_updated = True
+        except Exception:
+            pass  # web account update failed — license key issuance still proceeds below
+
+    # Generate the offline license key (desktop/CLI activation flow — unchanged)
     from orca.license.keys import generate_key
     key = generate_key(tier=tier, seats=seats, days=days)
 
@@ -106,14 +132,38 @@ def handle_stripe_event(payload: bytes, sig_header: str) -> dict:
         email_sent = send_license_email(email, key, tier, seats, days)
 
     return {
-        "status":     "ok",
-        "key":        key,
-        "tier":       tier,
-        "seats":      seats,
-        "days":       days,
-        "email":      email,
-        "email_sent": email_sent,
+        "status":          "ok",
+        "key":             key,
+        "tier":            tier,
+        "seats":           seats,
+        "days":            days,
+        "email":           email,
+        "email_sent":      email_sent,
+        "account_updated": account_updated,
     }
+
+
+def _handle_subscription_downgrade(event: dict) -> dict:
+    """
+    customer.subscription.deleted (cancellation) or invoice.payment_failed
+    (card declined) — downgrade the web account back to free. Without this,
+    a cancelled or failed subscription left the account at its paid tier
+    forever, since nothing ever downgraded it.
+    """
+    obj         = event["data"]["object"]
+    customer_id = obj.get("customer", "")
+    if not customer_id:
+        return {"status": "ignored", "type": event["type"], "reason": "no customer id on event"}
+
+    try:
+        from orca.auth.store import get_user_by_stripe_customer_id, set_user_tier
+        user = get_user_by_stripe_customer_id(customer_id)
+        if not user:
+            return {"status": "ignored", "type": event["type"], "reason": "no matching account"}
+        set_user_tier(user.id, "free")
+        return {"status": "ok", "type": event["type"], "user_id": user.id, "downgraded_to": "free"}
+    except Exception as e:
+        return {"status": "error", "type": event["type"], "reason": str(e)}
 
 
 # ─── Signature verification ────────────────────────────────────────────────────

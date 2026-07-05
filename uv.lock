@@ -2446,6 +2446,7 @@ all = [
     { name = "pdfminer-six" },
     { name = "pypdf" },
     { name = "python-docx" },
+    { name = "stripe" },
 ]
 dev = [
     { name = "mypy" },
@@ -2517,6 +2518,7 @@ requires-dist = [
     { name = "redis", marker = "extra == 'redis'", specifier = ">=5.0.0" },
     { name = "rich", specifier = ">=13.0.0" },
     { name = "scipy", marker = "extra == 'train'", specifier = ">=1.14.0" },
+    { name = "stripe", marker = "extra == 'all'", specifier = ">=7.0.0" },
     { name = "stripe", marker = "extra == 'stripe'", specifier = ">=7.0.0" },
     { name = "transformers", marker = "extra == 'train'", specifier = ">=4.45.0" },
     { name = "trl", marker = "extra == 'train'", specifier = ">=0.12.0" },

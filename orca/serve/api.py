@@ -31,7 +31,7 @@ from pydantic import BaseModel
 from orca.license import current_tier, get_active_license, has_feature
 from orca.license.keys import format_expiry
 
-from orca.auth import auth_router, get_current_user_optional, check_quota, increment_usage
+from orca.auth import auth_router, get_current_user, get_current_user_optional, check_quota, increment_usage
 from orca.auth.rbac import require_permission
 from orca.auth.store import User
 from orca import audit
@@ -540,6 +540,72 @@ async def license_status():
         "has_ultra":    False,
         "has_cloud":    False,
     }
+
+
+@app.post("/api/billing/checkout")
+async def create_checkout(
+    tier: str = "pro",
+    interval: str = "month",
+    user: User = Depends(get_current_user),
+):
+    """
+    Creates a Stripe Checkout Session for the AUTHENTICATED web user and
+    returns its URL for the frontend to redirect to. client_reference_id is
+    set to this user's id — the webhook handler reads it back to know WHICH
+    web account to upgrade once payment completes. Without this, a completed
+    Stripe payment had no way to connect back to a specific logged-in user's
+    account tier (see orca/license/stripe_hook.py for the other half of this).
+    """
+    import os as _os
+    try:
+        import stripe
+    except ImportError:
+        return JSONResponse({"error": "Stripe is not installed on this server."}, status_code=503)
+
+    stripe_secret = _os.environ.get("STRIPE_SECRET_KEY")
+    if not stripe_secret:
+        return JSONResponse({"error": "Stripe is not configured on this server."}, status_code=503)
+    stripe.api_key = stripe_secret
+
+    price_env_map = {
+        ("pro", "month"):        "STRIPE_PRICE_PRO",
+        ("pro", "year"):         "STRIPE_PRICE_PRO_YEAR",
+        ("enterprise", "month"): "STRIPE_PRICE_ENT",
+        ("enterprise", "year"):  "STRIPE_PRICE_ENT_YEAR",
+    }
+    price_id = _os.environ.get(price_env_map.get((tier, interval), "STRIPE_PRICE_PRO"), "")
+    if not price_id:
+        return JSONResponse(
+            {"error": f"No Stripe price configured for tier='{tier}' interval='{interval}'."},
+            status_code=503,
+        )
+
+    from orca.auth.store import get_stripe_customer_id
+    existing_customer_id = get_stripe_customer_id(user.id)
+
+    base_url = _os.environ.get("ORCA_PUBLIC_URL", "http://localhost:7337")
+
+    session_kwargs = dict(
+        mode="subscription",
+        line_items=[{"price": price_id, "quantity": 1}],
+        client_reference_id=user.id,
+        metadata={"user_id": user.id, "tier": tier},
+        success_url=f"{base_url}/?checkout=success",
+        cancel_url=f"{base_url}/?checkout=cancelled",
+    )
+    # Reuse the existing Stripe Customer if this user has paid before —
+    # avoids creating duplicate Customer records on every checkout attempt.
+    if existing_customer_id:
+        session_kwargs["customer"] = existing_customer_id
+    else:
+        session_kwargs["customer_email"] = user.email
+
+    try:
+        session = stripe.checkout.Session.create(**session_kwargs)
+    except Exception as e:
+        return JSONResponse({"error": f"Could not create checkout session: {e}"}, status_code=502)
+
+    return {"url": session.url}
 
 
 @app.post("/webhook/stripe")
