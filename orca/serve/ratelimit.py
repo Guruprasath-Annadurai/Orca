@@ -119,3 +119,4 @@ AUTH_FORGOT_PW = RateLimitRule(limit=3,   window_seconds=3600, label="auth_forgo
 CHAT_ANY       = RateLimitRule(limit=60,  window_seconds=60,   label="chat")           # 60/min/IP (auth or not)
 CODE_RUN       = RateLimitRule(limit=20,  window_seconds=60,   label="code_run")       # 20/min/IP
 DOC_UPLOAD     = RateLimitRule(limit=20,  window_seconds=60,   label="doc_upload")     # 20/min/IP
+VISION         = RateLimitRule(limit=15,  window_seconds=60,   label="vision")         # 15/min/IP — image uploads cost more than text

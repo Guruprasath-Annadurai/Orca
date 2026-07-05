@@ -54,6 +54,7 @@ from orca.docs.citation_check import check_citations
 from orca.docs.pii_redact import redact_pii
 from orca.brain.explainability import ExplainStore, build_from_rag_result
 from orca.brain.knowledge_graph import KnowledgeGraph
+from orca.brain.vision import is_vision_capable, encode_image, build_vision_message
 from orca.serve import session_store, ratelimit, metrics
 from orca.serve.moderation import check_input, CRISIS_RESOURCES
 from orca.code import run_code
@@ -1005,6 +1006,67 @@ async def code_run(
         "duration_ms": result.duration_ms,
         "ok":          result.ok,
     }
+
+
+MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20MB
+
+
+@app.post("/api/vision")
+async def vision_query(
+    request: Request,
+    message: str,
+    image: UploadFile = File(...),
+    session_id: str | None = None,
+    model_variant: str | None = None,
+    user: User | None = Depends(get_current_user_optional),
+):
+    """
+    One-shot image Q&A — NOT wired into the full AgentLoop (no tool use,
+    no multi-step reasoning over the image, no reflection pass). See
+    orca/brain/vision.py's module docstring for the honest scope. Requires
+    a vision-capable model actually pulled in Ollama; this project does not
+    ship one.
+    """
+    ratelimit.enforce(request, ratelimit.VISION, extra_key="vision")
+
+    data = await image.read()
+    if len(data) > MAX_IMAGE_SIZE:
+        return JSONResponse(
+            {"error": f"Image too large ({len(data)//1024//1024}MB). Max: {MAX_IMAGE_SIZE//1024//1024}MB"},
+            status_code=413,
+        )
+
+    model_name = _model_name_for_variant(model_variant)
+    if not is_vision_capable(model_name):
+        return JSONResponse(
+            {"error": f"Model '{model_name}' does not appear to be vision-capable. "
+                      f"Pull a vision model (e.g. `ollama pull llava` or `ollama pull llama3.2-vision`) "
+                      f"and configure it for this variant."},
+            status_code=400,
+        )
+
+    mod_result = check_input(message)
+    if mod_result.action == "block":
+        audit.log("input_moderation_blocked", user_id=user.id if user else None,
+                  detail={"categories": mod_result.flagged_categories, "endpoint": "vision"})
+        return JSONResponse(
+            {"error": "This request can't be processed — it matches a category we don't generate content for."},
+            status_code=400,
+        )
+
+    sess = _get_session(session_id, model_variant, user_id=user.id if user else None)
+    image_b64 = encode_image(data)
+    vision_message = build_vision_message(message, image_b64)
+
+    try:
+        response = await asyncio.to_thread(sess.brain.complete, [vision_message])
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+    audit.log("vision_query", user_id=user.id if user else None,
+              detail={"model": model_name, "image_bytes": len(data)})
+
+    return {"response": response, "session_id": sess.id, "model": model_name}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
