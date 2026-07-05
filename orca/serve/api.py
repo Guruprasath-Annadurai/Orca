@@ -574,6 +574,25 @@ async def list_models():
     }
 
 
+LEGAL_DIR = Path(__file__).parent.parent.parent / "legal"
+
+
+@app.get("/legal/privacy", response_class=PlainTextResponse)
+async def privacy_policy():
+    path = LEGAL_DIR / "PRIVACY_POLICY.md"
+    if not path.exists():
+        return PlainTextResponse("Privacy policy not found.", status_code=404)
+    return PlainTextResponse(path.read_text(), media_type="text/markdown")
+
+
+@app.get("/legal/terms", response_class=PlainTextResponse)
+async def terms_of_service():
+    path = LEGAL_DIR / "TERMS_OF_SERVICE.md"
+    if not path.exists():
+        return PlainTextResponse("Terms of service not found.", status_code=404)
+    return PlainTextResponse(path.read_text(), media_type="text/markdown")
+
+
 @app.get("/api/license")
 async def license_status():
     """Return current license tier and feature set for the web UI."""
