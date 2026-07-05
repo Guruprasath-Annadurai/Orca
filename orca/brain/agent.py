@@ -191,7 +191,13 @@ class AgentLoop:
     def _plan(self, user_input: str, sys_prompt: str) -> dict:
         """Ask Orca whether tools are needed."""
         tool_list = ", ".join(self.tools.all_names())
-        planner_sys = PLANNER_SYSTEM.format(tools=tool_list)
+        # .replace(), not .format() — PLANNER_SYSTEM contains literal JSON
+        # examples like {"action": "direct"}, and str.format() tries to parse
+        # EVERY {...} in the template as a placeholder, not just {tools}.
+        # That crashed with KeyError('"action"') on every single call — this
+        # is the actual chat/tool-planning path, so every message that
+        # reached _plan() was broken until this fix.
+        planner_sys = PLANNER_SYSTEM.replace("{tools}", tool_list)
         history_summary = ""
         if self._history:
             last = self._history[-2:]

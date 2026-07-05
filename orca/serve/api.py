@@ -42,6 +42,7 @@ from orca.brain.agent import AgentLoop
 from orca.brain.context import ContextManager
 from orca.tools import build_registry
 from orca.character import CORE_SYSTEM_WITH_TOOLS
+from orca.personas import get_persona_system
 from orca.config import CONFIG, ORCA_HOME
 from orca.variants.ultra import OrcaUltra
 from orca.docs import (
@@ -271,9 +272,10 @@ async def chat(
     sess = _get_session(req.session_id, req.model_variant)
     mem_ctx = sess.memory.recall_context(req.message, n=3)
     enriched = f"[Relevant memory]\n{mem_ctx}\n\n{req.message}" if mem_ctx else req.message
+    persona_system = get_persona_system(sess.model_variant)
 
     try:
-        final, trace = await asyncio.to_thread(sess.agent.run, enriched)
+        final, trace = await asyncio.to_thread(sess.agent.run, enriched, persona_system)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
@@ -333,6 +335,7 @@ async def stream_chat(
         if rag_result.context_block:
             enriched = f"[Document context — cite sources as [D1], [D2], etc.]\n{rag_result.context_block}\n\n{enriched}"
 
+    persona_system = get_persona_system(sess.model_variant)
     message_id = str(uuid.uuid4())
 
     async def _event_stream() -> AsyncIterator[str]:
@@ -347,7 +350,7 @@ async def stream_chat(
 
         try:
             gen, trace = await asyncio.to_thread(
-                lambda: sess.agent.stream(enriched)
+                lambda: sess.agent.stream(enriched, persona_system)
             )
             # Send tool activity if any
             if trace.plan_action == "tools":
