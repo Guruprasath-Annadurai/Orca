@@ -1306,6 +1306,90 @@ def license_cmd(
     ))
 
 
+@app.command("backup")
+def backup_cmd(
+    keep: int = typer.Option(7, "--keep", help="Number of backups to retain after pruning"),
+    no_prune: bool = typer.Option(False, "--no-prune", help="Skip pruning old backups this run"),
+):
+    """
+    Back up the auth database (users, audit log, everything). Meant to be
+    invoked by an external scheduler (cron, systemd timer) — this does not
+    schedule itself, since an in-process scheduler dies exactly when the
+    server crashes, which is when you most need backups to keep running.
+
+    Example crontab entry (daily at 3am):
+      0 3 * * * cd /path/to/orca && uv run orca backup --keep 14
+    """
+    from orca.ops.backup import run_backup, prune_old_backups
+
+    try:
+        report = run_backup()
+    except Exception as e:
+        console.print(f"[red]Backup failed: {e}[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"[green]✓ Backup created:[/green] {report['path']} ({report['size_bytes']:,} bytes, {report['backend']})")
+
+    if not no_prune:
+        prune_report = prune_old_backups(keep_last_n=keep)
+        if prune_report["deleted_count"] > 0:
+            console.print(f"[dim]Pruned {prune_report['deleted_count']} old backup(s), kept {prune_report['kept']}[/dim]")
+
+
+@app.command("backups")
+def backups_list_cmd():
+    """List all backups on disk, newest first."""
+    from orca.ops.backup import list_backups
+    from rich.table import Table
+
+    backups = list_backups()
+    if not backups:
+        console.print("[dim]No backups found. Run: orca backup[/dim]")
+        return
+
+    table = Table(box=None, show_header=True, header_style="bold")
+    table.add_column("Path")
+    table.add_column("Size")
+    table.add_column("Created")
+    for b in backups:
+        table.add_row(b["path"], f"{b['size_bytes']:,} bytes", b["modified_at"])
+    console.print(table)
+
+
+@app.command("restore")
+def restore_cmd(
+    backup_path: str = typer.Argument(..., help="Path to a backup file (see: orca backups)"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip the confirmation prompt"),
+):
+    """
+    Restore the auth database from a backup — OVERWRITES the live database.
+    Automatically backs up the current state first, so a wrong choice here
+    is itself recoverable. SQLite only — for Postgres, use pg_restore
+    directly (see orca/ops/backup.py module docstring for why).
+    """
+    from orca.auth.db import BACKEND
+    from orca.ops.backup import restore_sqlite
+
+    if BACKEND != "sqlite":
+        console.print(f"[red]Current backend is '{BACKEND}', not sqlite. Use pg_restore directly for Postgres.[/red]")
+        raise typer.Exit(1)
+
+    if not yes:
+        confirmed = typer.confirm(f"This will OVERWRITE the live database with {backup_path}. Continue?")
+        if not confirmed:
+            console.print("[dim]Cancelled.[/dim]")
+            raise typer.Exit(0)
+
+    try:
+        report = restore_sqlite(backup_path, confirm=True)
+    except Exception as e:
+        console.print(f"[red]Restore failed: {e}[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"[green]✓ Restored from:[/green] {report['restored_from']}")
+    console.print(f"[dim]Pre-restore safety backup saved to: {report['pre_restore_backup']}[/dim]")
+
+
 @app.command("doctor")
 def doctor_cmd(
     fix:    bool = typer.Option(False, "--fix",    "-f", help="Auto-repair failing checks"),
