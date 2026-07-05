@@ -53,6 +53,7 @@ from orca.docs import (
 from orca.docs.citation_check import check_citations
 from orca.docs.pii_redact import redact_pii
 from orca.brain.explainability import ExplainStore, build_from_rag_result
+from orca.brain.knowledge_graph import KnowledgeGraph
 from orca.serve import session_store, ratelimit
 from orca.serve.moderation import check_input, CRISIS_RESOURCES
 from orca.code import run_code
@@ -124,6 +125,7 @@ class _Session:
         self.brain = brain
         self.doc_store = DocStore(session_id=session_id, ollama_host=CONFIG.ollama.host)
         self.explain_store = ExplainStore()
+        self.knowledge_graph = KnowledgeGraph(session_id=session_id)
         self.last_active = time.time()
 
     def touch(self):
@@ -426,6 +428,18 @@ async def stream_chat(
         if user:
             increment_usage(user.id, "message")
 
+        # Knowledge graph extraction — fire-and-forget, NOT awaited. This is
+        # an LLM call (real latency on CPU inference per this project's own
+        # benchmarks), and the user is already looking at their finished
+        # response by this point — making them wait for graph extraction
+        # too would be pure UX cost for a background-enrichment feature.
+        # Failures here are silent by design (extract_and_add never raises)
+        # and don't affect the conversation that already completed.
+        asyncio.create_task(asyncio.to_thread(
+            sess.knowledge_graph.extract_and_add,
+            f"{req.message}\n{full}", "chat", sess.brain,
+        ))
+
         # Citation compliance: mechanical check, not just a prompt instruction.
         # If document context was available and the response cited zero
         # sources, that's a real governance signal — logged for visibility
@@ -528,6 +542,28 @@ async def explain_answer(session_id: str, message_id: str):
             status_code=404,
         )
     return record.to_dict()
+
+
+@app.get("/api/knowledge/{session_id}")
+async def knowledge_graph_summary(session_id: str):
+    """Lists every entity the knowledge graph has extracted for this session."""
+    sess = _get_session(session_id)
+    return {
+        "session_id": session_id,
+        "count": sess.knowledge_graph.count(),
+        "entities": sess.knowledge_graph.all_entities(),
+    }
+
+
+@app.get("/api/knowledge/{session_id}/{entity_name}")
+async def knowledge_graph_entity(session_id: str, entity_name: str):
+    """Full detail on one entity — its relationships as subject and object, plus one-hop neighbors."""
+    sess = _get_session(session_id)
+    info = sess.knowledge_graph.query_entity(entity_name)
+    if info is None:
+        return JSONResponse({"error": f"No entity '{entity_name}' found in this session's knowledge graph."}, status_code=404)
+    info["neighbors"] = sess.knowledge_graph.neighbors(entity_name)
+    return info
 
 
 @app.get("/api/session/{session_id}/export")

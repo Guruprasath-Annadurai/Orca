@@ -15,6 +15,7 @@ What this deletes:
   - Every session this account is known to have touched:
       - Episodic memory file (orca/brain/memory.py's EpisodicMemory)
       - DocStore vectors + doc registry entries (orca/docs/store.py)
+      - Knowledge graph entities/relationships (orca/brain/knowledge_graph.py)
       - Session title entry (orca/serve/api.py's session_titles.json)
       - Redis session state, if enabled (orca/serve/session_store.py)
   - Attempts to cancel any active Stripe subscription tied to this account
@@ -43,13 +44,14 @@ from pathlib import Path
 from orca.auth.store import get_user_session_ids, delete_user_account_records, get_stripe_customer_id
 from orca.docs.store import unregister_doc, list_docs, DocStore
 from orca.brain.memory import EpisodicMemory
+from orca.brain.knowledge_graph import KnowledgeGraph
 from orca.serve import session_store
 from orca.config import ORCA_HOME, CONFIG
 
 
 def _delete_session_data(session_id: str) -> dict:
     """Best-effort cleanup of everything scoped to one session_id. Never raises — one failed store shouldn't block cleanup of the rest."""
-    result = {"session_id": session_id, "memory_deleted": False, "docs_deleted": 0, "redis_deleted": False}
+    result = {"session_id": session_id, "memory_deleted": False, "docs_deleted": 0, "redis_deleted": False, "knowledge_graph_deleted": False}
 
     try:
         ep = EpisodicMemory(session_id)
@@ -69,6 +71,14 @@ def _delete_session_data(session_id: str) -> dict:
             result["docs_deleted"] = len(docs)
     except Exception as e:
         result["docs_error"] = str(e)
+
+    try:
+        kg = KnowledgeGraph(session_id)
+        had_data = kg.count()["entities"] > 0
+        kg.clear()
+        result["knowledge_graph_deleted"] = had_data
+    except Exception as e:
+        result["knowledge_graph_error"] = str(e)
 
     try:
         session_store.delete_session(session_id)
