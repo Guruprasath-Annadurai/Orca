@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Iterator
 
 from orca.brain.providers import OrcaBrain
+from orca.brain.context_intelligence import apply_context_policy
 from orca.tools import ToolRegistry
 from orca.character import CORE_SYSTEM_WITH_TOOLS, REFLECTION_PROMPT
 
@@ -134,6 +135,7 @@ class AgentLoop:
         # Update history
         self._history.append({"role": "user", "content": user_input})
         self._history.append({"role": "assistant", "content": final})
+        self._compress_history_if_needed()
 
         return final, trace
 
@@ -174,6 +176,7 @@ class AgentLoop:
             trace.draft = full
             self._history.append({"role": "user", "content": user_input})
             self._history.append({"role": "assistant", "content": full})
+            self._compress_history_if_needed()
 
         return _gen(), trace
 
@@ -185,6 +188,19 @@ class AgentLoop:
 
     def get_history(self) -> list[dict]:
         return list(self._history)
+
+    def _compress_history_if_needed(self) -> None:
+        """
+        Context Intelligence — replaces what used to be unbounded growth.
+        self._history had NO size cap at all before this; every turn just
+        appended forever until the prompt sent to the model exceeded its
+        context window. Cheap no-op check on every turn (char count), only
+        does the (LLM-call-costing) summarization once the budget is
+        actually exceeded — most conversations never trigger it.
+        """
+        result = apply_context_policy(self._history, self.brain)
+        if result.compressed:
+            self._history = result.history
 
     # ── Internal ──────────────────────────────────────────────────────────────
 
