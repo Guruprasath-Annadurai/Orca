@@ -221,3 +221,39 @@ def get_usage_today(user_id: str) -> dict:
     if not row:
         return {"messages": 0, "ultra_runs": 0}
     return {"messages": row["messages"], "ultra_runs": row["ultra_runs"]}
+
+
+# ── User <-> session mapping (needed for account deletion to actually cascade) ──
+# Chat history, uploaded documents, and memory files are keyed purely by
+# session_id — nothing tied them to an owning user_id before this table
+# existed, meaning "delete my account" had no way to find and remove them.
+
+def record_user_session(user_id: str, session_id: str) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO user_sessions (user_id, session_id, created_at) VALUES (?,?,?) "
+            "ON CONFLICT(user_id, session_id) DO NOTHING",
+            (user_id, session_id, datetime.utcnow().isoformat()),
+        )
+
+
+def get_user_session_ids(user_id: str) -> list[str]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT session_id FROM user_sessions WHERE user_id=?", (user_id,)
+        ).fetchall()
+    return [r["session_id"] for r in rows]
+
+
+def delete_user_account_records(user_id: str) -> None:
+    """Deletes the account-level rows (users, usage_daily, api_keys, user_sessions).
+    Does NOT touch session-scoped data (memory files, docs, Redis) — that's
+    orchestrated separately in orca/serve/account_delete.py, since it needs
+    access to DocStore/EpisodicMemory/session_store, which this module
+    intentionally doesn't import (keeps store.py's dependency footprint to
+    just the DB layer)."""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM api_keys WHERE user_id=?", (user_id,))
+        conn.execute("DELETE FROM usage_daily WHERE user_id=?", (user_id,))
+        conn.execute("DELETE FROM user_sessions WHERE user_id=?", (user_id,))
+        conn.execute("DELETE FROM users WHERE id=?", (user_id,))

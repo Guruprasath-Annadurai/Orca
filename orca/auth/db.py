@@ -53,6 +53,13 @@ CREATE TABLE IF NOT EXISTS usage_daily (
     ultra_runs INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, date)
 );
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+    user_id    TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, session_id)
+);
 """
 
 # Postgres gets the full audit_log hash-chain schema from day one — there's
@@ -80,6 +87,13 @@ CREATE TABLE IF NOT EXISTS usage_daily (
     messages   INTEGER NOT NULL DEFAULT 0,
     ultra_runs INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, date)
+);
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+    user_id    TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, session_id)
 );
 
 CREATE TABLE IF NOT EXISTS audit_log (

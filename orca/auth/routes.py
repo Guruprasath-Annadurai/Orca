@@ -355,3 +355,31 @@ async def admin_set_role(
         raise HTTPException(400, "Invalid role")
     set_user_role(user_id, body.role)
     return {"updated": True}
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str
+
+
+@router.post("/account/delete")
+async def delete_account_endpoint(req: DeleteAccountRequest, user: User = Depends(get_current_user)):
+    """
+    Right-to-delete — requires the current password (not just an active
+    session token) before deleting anything. Same reasoning as requiring a
+    fresh TOTP code to disable 2FA: a hijacked session token alone (XSS,
+    stolen JWT) shouldn't be enough to trigger an irreversible account
+    deletion.
+    """
+    from orca.auth.store import authenticate
+    if not authenticate(user.email, req.password):
+        raise HTTPException(401, "Incorrect password.")
+
+    from orca.serve.account_delete import delete_account
+    report = delete_account(user.id)
+
+    from orca import audit
+    audit.log("account_deleted", user_id=user.id, detail={
+        "sessions_processed": report["sessions_processed"],
+    })
+
+    return report

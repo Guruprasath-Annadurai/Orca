@@ -137,12 +137,20 @@ class _Session:
 _sessions: dict[str, _Session] = {}
 
 
-def _get_session(session_id: str | None, model_variant: str | None = None) -> _Session:
+def _get_session(session_id: str | None, model_variant: str | None = None, user_id: str | None = None) -> _Session:
     sid = session_id or str(uuid.uuid4())
     if sid not in _sessions:
         _sessions[sid] = _Session(sid, model_variant)
     _sessions[sid].touch()
     session_store.touch_session(sid)  # refresh Redis TTL — no-op if Redis disabled
+
+    # Records which account this session belongs to — without this, "delete
+    # my account" has no way to find and remove the chat history/documents
+    # tied to it, since sessions are otherwise anonymous by session_id alone.
+    if user_id:
+        from orca.auth.store import record_user_session
+        record_user_session(user_id, sid)
+
     # Evict idle sessions (>2h) to save memory
     now = time.time()
     stale = [k for k, v in _sessions.items() if now - v.last_active > 7200 and k != sid]
@@ -289,7 +297,7 @@ async def chat(
         audit.log(f"input_moderation_{mod_result.action}", user_id=user.id if user else None,
                   detail={"categories": mod_result.flagged_categories})
 
-    sess = _get_session(req.session_id, req.model_variant)
+    sess = _get_session(req.session_id, req.model_variant, user_id=user.id if user else None)
     mem_ctx = sess.memory.recall_context(req.message, n=3)
     enriched = f"[Relevant memory]\n{mem_ctx}\n\n{req.message}" if mem_ctx else req.message
     persona_system = get_persona_system(sess.model_variant)
@@ -350,7 +358,7 @@ async def stream_chat(
         audit.log(f"input_moderation_{mod_result.action}", user_id=user.id if user else None,
                   detail={"categories": mod_result.flagged_categories})
 
-    sess = _get_session(req.session_id, req.model_variant)
+    sess = _get_session(req.session_id, req.model_variant, user_id=user.id if user else None)
     mem_ctx = sess.memory.recall_context(req.message, n=3)
     enriched = f"[Relevant memory]\n{mem_ctx}\n\n{req.message}" if mem_ctx else req.message
 
@@ -825,7 +833,7 @@ async def upload_doc(
     doc_id = str(uuid.uuid4())
     chunks = chunk_text(text, doc_id=doc_id, filename=filename)
 
-    sess = _get_session(session_id)
+    sess = _get_session(session_id, user_id=user.id if user else None)
     stored = sess.doc_store.add_chunks(chunks, doc_id=doc_id, filename=filename)
     register_doc(sess.id, doc_id, filename, chunk_count=stored, size_bytes=len(data))
 
@@ -857,7 +865,7 @@ async def delete_doc(
     user: User | None = Depends(get_current_user_optional),
 ):
     """Remove a document and all its chunks from the session store."""
-    sess = _get_session(session_id)
+    sess = _get_session(session_id, user_id=user.id if user else None)
     ok = sess.doc_store.delete_doc(doc_id)
     unregister_doc(sess.id, doc_id)
     audit.log("doc_delete", user_id=user.id if user else None, detail={"doc_id": doc_id})
