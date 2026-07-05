@@ -53,6 +53,7 @@ from orca.docs import (
 from orca.docs.citation_check import check_citations
 from orca.brain.explainability import ExplainStore, build_from_rag_result
 from orca.serve import session_store, ratelimit
+from orca.serve.moderation import check_input, CRISIS_RESOURCES
 from orca.code import run_code
 
 _START_TIME = time.time()
@@ -270,10 +271,32 @@ async def chat(
                 status_code=429,
             )
 
+    # Input moderation — checked before the message ever reaches the model.
+    # BLOCK: hard refusal, generation never happens. SUPPORT (self-harm):
+    # never blocked — crisis resources get injected into context instead,
+    # since refusing someone in crisis is the opposite of good practice.
+    # FLAG: logged for visibility, generation proceeds unchanged.
+    mod_result = check_input(req.message)
+    if mod_result.action == "block":
+        audit.log("input_moderation_blocked", user_id=user.id if user else None,
+                  detail={"categories": mod_result.flagged_categories})
+        return JSONResponse(
+            {"error": "This request can't be processed — it matches a category we don't generate content for."},
+            status_code=400,
+        )
+    if mod_result.action in ("support", "flag"):
+        audit.log(f"input_moderation_{mod_result.action}", user_id=user.id if user else None,
+                  detail={"categories": mod_result.flagged_categories})
+
     sess = _get_session(req.session_id, req.model_variant)
     mem_ctx = sess.memory.recall_context(req.message, n=3)
     enriched = f"[Relevant memory]\n{mem_ctx}\n\n{req.message}" if mem_ctx else req.message
     persona_system = get_persona_system(sess.model_variant)
+    if mod_result.action == "support":
+        persona_system += (
+            f"\n\nIMPORTANT: This message may indicate the user is in emotional distress or crisis. "
+            f"Respond with warmth and care. Include these resources naturally in your response:\n{CRISIS_RESOURCES}"
+        )
 
     try:
         final, trace = await asyncio.to_thread(sess.agent.run, enriched, persona_system)
@@ -314,6 +337,18 @@ async def stream_chat(
                 yield f"data: {json.dumps({'type':'error','text':f'Daily limit reached ({used}/{limit}). Upgrade to Pro.'})}\n\n"
             return StreamingResponse(_quota_err(), media_type="text/event-stream")
 
+    mod_result = check_input(req.message)
+    if mod_result.action == "block":
+        audit.log("input_moderation_blocked", user_id=user.id if user else None,
+                  detail={"categories": mod_result.flagged_categories})
+        _mod_block_msg = "This request can't be processed — it matches a category we don't generate content for."
+        async def _mod_block():
+            yield f"data: {json.dumps({'type': 'error', 'text': _mod_block_msg})}\n\n"
+        return StreamingResponse(_mod_block(), media_type="text/event-stream")
+    if mod_result.action in ("support", "flag"):
+        audit.log(f"input_moderation_{mod_result.action}", user_id=user.id if user else None,
+                  detail={"categories": mod_result.flagged_categories})
+
     sess = _get_session(req.session_id, req.model_variant)
     mem_ctx = sess.memory.recall_context(req.message, n=3)
     enriched = f"[Relevant memory]\n{mem_ctx}\n\n{req.message}" if mem_ctx else req.message
@@ -337,6 +372,11 @@ async def stream_chat(
             enriched = f"[Document context — cite sources as [D1], [D2], etc.]\n{rag_result.context_block}\n\n{enriched}"
 
     persona_system = get_persona_system(sess.model_variant)
+    if mod_result.action == "support":
+        persona_system += (
+            f"\n\nIMPORTANT: This message may indicate the user is in emotional distress or crisis. "
+            f"Respond with warmth and care. Include these resources naturally in your response:\n{CRISIS_RESOURCES}"
+        )
     message_id = str(uuid.uuid4())
 
     async def _event_stream() -> AsyncIterator[str]:
