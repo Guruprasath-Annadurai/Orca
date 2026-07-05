@@ -77,6 +77,9 @@ postgres = [
 redis = [
     "redis>=5.0.0",
 ]
+nvidia = [
+    "openai>=1.0.0",
+]
 
 [project.scripts]
 orca = "orca.cli:app"
