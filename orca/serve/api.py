@@ -54,7 +54,7 @@ from orca.docs.citation_check import check_citations
 from orca.docs.pii_redact import redact_pii
 from orca.brain.explainability import ExplainStore, build_from_rag_result
 from orca.brain.knowledge_graph import KnowledgeGraph
-from orca.serve import session_store, ratelimit
+from orca.serve import session_store, ratelimit, metrics
 from orca.serve.moderation import check_input, CRISIS_RESOURCES
 from orca.code import run_code
 
@@ -69,6 +69,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    """
+    Records request count/status/latency per endpoint. Uses the matched
+    ROUTE TEMPLATE (e.g. "/api/explain/{session_id}/{message_id}"), not the
+    raw path with real session IDs substituted in — using raw paths as
+    metric labels would create unbounded cardinality (a new "endpoint" for
+    every distinct session/doc/message ID ever seen), which is exactly the
+    kind of metrics-system footgun that quietly blows up memory in
+    production. route.path is only available on request.scope AFTER
+    routing has resolved, which happens by the time call_next() returns.
+    """
+    start = time.monotonic()
+    response = await call_next(request)
+    duration_ms = (time.monotonic() - start) * 1000
+
+    route = request.scope.get("route")
+    endpoint = route.path if route else request.url.path
+    metrics.record_request(f"{request.method} {endpoint}", response.status_code, duration_ms)
+
+    return response
+
 
 app.include_router(auth_router)
 
@@ -943,6 +967,27 @@ async def code_run(
         "duration_ms": result.duration_ms,
         "ok":          result.ok,
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Monitoring
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/admin/metrics")
+async def admin_metrics(admin: User = Depends(require_permission("audit_read"))):
+    """JSON metrics snapshot — request counts, error rates, latency percentiles per endpoint."""
+    return metrics.get_metrics_snapshot()
+
+
+@app.get("/metrics", response_class=PlainTextResponse)
+async def prometheus_metrics():
+    """
+    Prometheus exposition format — no auth, standard scrape convention.
+    If exposing this port publicly, put a firewall/reverse-proxy rule in
+    front of it; this endpoint reveals operational detail (request volumes,
+    error rates, endpoint names) that shouldn't be internet-visible.
+    """
+    return PlainTextResponse(metrics.get_prometheus_text(), media_type="text/plain; version=0.0.4")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
