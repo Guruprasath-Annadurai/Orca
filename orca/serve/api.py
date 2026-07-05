@@ -671,6 +671,35 @@ async def ai_policy():
     return PlainTextResponse(path.read_text(), media_type="text/markdown")
 
 
+DOCS_DIR = Path(__file__).parent.parent.parent / "docs"
+_DOCS_FILES = {
+    "self-hosting": "SELF_HOSTING.md",
+    "api-reference": "API_REFERENCE.md",
+    "model-cards": "MODEL_CARDS.md",
+    "architecture": "ARCHITECTURE.md",
+}
+
+
+@app.get("/docs", response_class=PlainTextResponse)
+async def docs_index():
+    """Lists available documentation pages."""
+    lines = ["Orca Documentation", "==================", ""]
+    for slug in _DOCS_FILES:
+        lines.append(f"  /docs/{slug}")
+    return PlainTextResponse("\n".join(lines))
+
+
+@app.get("/docs/{slug}", response_class=PlainTextResponse)
+async def docs_page(slug: str):
+    filename = _DOCS_FILES.get(slug)
+    if not filename:
+        return PlainTextResponse(f"No doc page named '{slug}'. See /docs for the index.", status_code=404)
+    path = DOCS_DIR / filename
+    if not path.exists():
+        return PlainTextResponse("Doc file not found.", status_code=404)
+    return PlainTextResponse(path.read_text(), media_type="text/markdown")
+
+
 @app.get("/api/license")
 async def license_status():
     """Return current license tier and feature set for the web UI."""
